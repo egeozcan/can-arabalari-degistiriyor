@@ -405,6 +405,7 @@ function comic(str, x, y, col = '#ffd93b', size = 70) {
   ctx.font = `800 ${size * 0.42}px ${FONT}`;
   size = Math.max(size, ctx.measureText(str).width * 0.62 + 10);
   x = clamp(x, size + 10, W - size - 10); y = clamp(y, size + 10, H - size);
+  P = P.filter(q => q.kind !== 'burst');
   addP({ kind: 'burst', str, x, y, size, col, life: 0.9, rot: rand(-0.2, 0.2), vy: -30 });
 }
 
@@ -412,7 +413,7 @@ function comic(str, x, y, col = '#ffd93b', size = 70) {
 const COLORS = [
   ['#ff4747', 'Kırmızı'], ['#ff9f1c', 'Turuncu'], ['#ffd23f', 'Sarı'], ['#4cc95a', 'Yeşil'],
   ['#3d8bff', 'Mavi'], ['#9b5de5', 'Mor'], ['#ff6fb5', 'Pembe'], ['#25c4c4', 'Turkuaz'],
-  ['#f4f4f4', 'Beyaz'], ['#3a3a4a', 'Siyah'],
+  ['#f4f4f4', 'Beyaz'], ['#4b4b6e', 'Siyah'],
 ];
 const CATS = [
   { key: 'color', icon: '🎨', bg: '#ff6b6b', names: COLORS.map(c => c[1]) },
@@ -1373,6 +1374,7 @@ const Garage = {
   },
   key(e) {
     const k = e.key;
+    if (e.repeat) return;
     if (k === 'Enter') { this.goBtn.press = 1; this.start(); return; }
     if (k === ' ') { honk(car, 640, 560 - this.z, 1.2); if (this.z <= 0) this.vz = 380; this.idle = 0; return; }
     if (k >= '1' && k <= '8') { const b = this.btns[+k - 1]; b.press = 1; b.onClick(); return; }
@@ -1870,15 +1872,15 @@ const Drive = {
     ctx.save(); const mc = { ...car, hatLift: 0, honkT: 0, squash: 0, mud: car.mud };
     drawCar(mc, bx + bw * p, by + 18, 0.2, { t }); ctx.restore();
     // ipuçları
-    if (this.t < 12 && !this.finished) {
-      const a = clamp((12 - this.t) / 2, 0, 1);
+    if (this.startT <= 0 && this.t < 14 && !this.finished) {
+      const a = clamp((14 - this.t) / 2, 0, 1);
       ctx.globalAlpha = a;
       const kc = (x, y, s) => { ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.beginPath(); rr(x - 26, y - 24, 52, 48, 10); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke(); text(s, x, y + 2, 30, OUT); };
       ctx.save(); ctx.translate(475, 0);
       ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); rr(14, 84, 330, 76, 18); ctx.fill();
       kc(50, 122, '▲'); kc(108, 122, '▼');
       ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.beginPath(); rr(156, 98, 110, 48, 10); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
-      text('boşluk', 211, 123, 22, OUT); emoji('📯', 300, 122, 40);
+      ctx.beginPath(); ctx.moveTo(176, 112); ctx.lineTo(176, 130); ctx.lineTo(246, 130); ctx.lineTo(246, 112); ctx.lineWidth = 4; ctx.stroke(); emoji('📯', 300, 122, 40);
       ctx.restore();
       ctx.globalAlpha = 1;
     }
@@ -1926,9 +1928,9 @@ const End = {
   draw() {
     const t = this.t;
     drawWorld(COURSE_LEN - CARX, t);
-    ctx.fillStyle = 'rgba(40,20,70,0.35)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, 0, W, H);
     // kupa
-    ctx.save(); ctx.translate(640, 150 + Math.sin(t * 3) * 6); ctx.rotate(Math.sin(t * 2) * 0.06);
+    ctx.save(); ctx.translate(470, 160 + Math.sin(t * 3) * 6); ctx.rotate(Math.sin(t * 2) * 0.06);
     ctx.lineWidth = 6; ctx.strokeStyle = OUT;
     ctx.beginPath(); ctx.arc(-62, -40, 26, Math.PI * 0.5, Math.PI * 1.5); ctx.stroke(); ctx.beginPath(); ctx.arc(62, -40, 26, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(-62, -80); ctx.lineTo(62, -80); ctx.quadraticCurveTo(60, 10, 0, 20); ctx.quadraticCurveTo(-60, 10, -62, -80); ctx.closePath(); ctx.fillStyle = '#ffd23f'; ctx.fill(); ctx.stroke();
@@ -1938,12 +1940,12 @@ const End = {
     ell(-30, -58, 8, 18, 0.3, 'rgba(255,255,255,0.6)');
     ctx.restore();
     // yıldızlar
-    ctx.lineWidth = 5; ctx.strokeStyle = '#b8860b'; starPath(560, 285, 40, 18); ctx.fillStyle = '#ffd93b'; ctx.fill(); ctx.stroke();
-    text('× ' + this.shown, 670, 290, 76, '#fff', { stroke: OUT, lw: 12 });
+    ctx.lineWidth = 5; ctx.strokeStyle = '#b8860b'; starPath(720, 160, 40, 18); ctx.fillStyle = '#ffd93b'; ctx.fill(); ctx.stroke();
+    text('× ' + this.shown, 830, 165, 76, '#fff', { stroke: OUT, lw: 12 });
     // dans eden araba
     ell(640, 524, 160, 18, 0, 'rgba(0,0,0,0.3)');
     drawP();
-    drawCar(car, 640, 520 - Math.abs(Math.sin(t * Math.PI * 2)) * 14, 1.0, { t, rot: Math.sin(t * Math.PI * 2) * 0.08 });
+    drawCar(car, 640, 530 - Math.abs(Math.sin(t * Math.PI * 2)) * 14, 0.9, { t, rot: Math.sin(t * Math.PI * 2) * 0.08 });
     this.again.draw(t); this.garage.draw(t);
   },
   click(p) {
