@@ -26,7 +26,7 @@ jobs:
         with:
           enablement: true
       - name: Prepare site
-        run: mkdir _site && cp index.html game.js _site/ && touch _site/.nojekyll
+        run: mkdir _site && cp -r index.html game.js icon.png manifest.webmanifest fonts _site/ && touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

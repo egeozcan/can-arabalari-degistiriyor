@@ -1,0 +1,10 @@
+{
+  "name": "Çılgın Arabalar",
+  "short_name": "Arabalar",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#2b2140",
+  "theme_color": "#2b2140",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png" }]
+}

@@ -186,6 +186,31 @@ const Snd = {
       case 6:
         for (let k = 0; k < 4; k++) this.tone(2400, 0.08, { type: 'sine', vol: 0.14, slide: 3400, delay: k * 0.11 });
         break;
+      case 7: // miyav
+        this.tone(520, 0.22, { type: 'sawtooth', vol: 0.12, slide: 820, filter: 1800, ftype: 'bandpass', q: 2 });
+        this.tone(820, 0.4, { type: 'sawtooth', vol: 0.12, slide: 430, filter: 1800, ftype: 'bandpass', q: 2, delay: 0.2 });
+        break;
+      case 8: // hav hav
+        for (let k = 0; k < 2; k++) {
+          this.tone(340, 0.13, { type: 'square', vol: 0.12, slide: 170, filter: 1200, delay: k * 0.22 });
+          this.noise(0.1, { freq: 900, ftype: 'bandpass', vol: 0.2, delay: k * 0.22 });
+        }
+        break;
+      case 9: // tren düdüğü
+        [392, 494, 587].forEach(f => this.tone(f, 1.0, { type: 'triangle', vol: 0.09, hold: true, attack: 0.05, vib: [5, 4] }));
+        this.noise(1.0, { freq: 2500, ftype: 'bandpass', vol: 0.06 });
+        break;
+      case 10: // kükreme
+        this.noise(1.0, { freq: 500, slide: 150, vol: 0.55, attack: 0.08 });
+        this.tone(110, 1.0, { type: 'sawtooth', vol: 0.15, slide: 70, filter: 500, vib: [22, 18], hold: true, attack: 0.08 });
+        break;
+      case 11: // ding dong
+        this.tone(880, 0.7, { type: 'sine', vol: 0.22 }); this.tone(1760, 0.4, { type: 'sine', vol: 0.05 });
+        this.tone(698, 0.9, { type: 'sine', vol: 0.22, delay: 0.38 }); this.tone(1396, 0.5, { type: 'sine', vol: 0.05, delay: 0.38 });
+        break;
+      case 12: // melodi
+        [523, 659, 784, 659, 1046].forEach((f, k) => this.tone(f, k === 4 ? 0.35 : 0.12, { type: 'square', vol: 0.08, filter: 3000, delay: k * 0.11 }));
+        break;
     }
   },
   quack(d = 0) {
@@ -235,7 +260,7 @@ const Snd = {
   },
 };
 
-const HORN_TXT = ['DÜT DÜT!', 'VAK VAK!', 'MÖÖÖ!', 'PIRT!', 'BOİİNG!', 'DİYU DİYU!', 'CİK CİK!'];
+const HORN_TXT = ['DÜT DÜT!', 'VAK VAK!', 'MÖÖÖ!', 'PIRT!', 'BOİİNG!', 'DİYU DİYU!', 'CİK CİK!', 'MİYAV!', 'HAV HAV!', 'TUUUT!', 'GRAAAV!', 'DİNG DONG!', 'DÜRÜDÜ!'];
 
 // ---- müzik
 const TRACKS = {
@@ -297,7 +322,7 @@ Voice.init();
 const say = (t, f) => Voice.say(t, f);
 
 // ============================================================ parçacıklar
-let P = [];
+let P = [], RIB = [];
 function addP(o) {
   const p = Object.assign({ x: 0, y: 0, vx: 0, vy: 0, g: 0, life: 1, size: 10, grow: 0, rot: 0, vr: 0,
     kind: 'circle', col: '#fff', alpha: 1, drag: 0 }, o);
@@ -306,7 +331,27 @@ function addP(o) {
   P.push(p);
   return p;
 }
+function updateRib(dt) {
+  for (const r of RIB) { r.x += r.vx * dt; r.life -= dt; }
+  while (RIB.length && RIB[0].life <= 0) RIB.shift();
+  if (RIB.length > 400) RIB.splice(0, RIB.length - 400);
+}
+function drawRib() {
+  if (RIB.length < 2) return;
+  const rc = ['#ff4747', '#ff9f1c', '#ffd23f', '#4cc95a', '#3d8bff', '#9b5de5'];
+  ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+  for (let k = 0; k < 6; k++) {
+    ctx.beginPath();
+    for (let i = 0; i < RIB.length; i++) {
+      const r = RIB[i], y = r.y + (k - 2.5) * 9 * r.s;
+      if (i === 0 || Math.abs(r.x - RIB[i - 1].x) > 90 || Math.abs(r.y - RIB[i - 1].y) > 90) ctx.moveTo(r.x, y); else ctx.lineTo(r.x, y);
+    }
+    ctx.lineWidth = 9.5 * RIB[RIB.length - 1].s; ctx.strokeStyle = rc[k]; ctx.globalAlpha = 0.9; ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
 function updateP(dt) {
+  updateRib(dt);
   for (let i = P.length - 1; i >= 0; i--) {
     const p = P[i];
     p.life -= dt;
@@ -325,6 +370,7 @@ function updateP(dt) {
   }
 }
 function drawP() {
+  drawRib();
   for (const p of P) {
     const a = clamp(p.life / p.max, 0, 1);
     ctx.globalAlpha = p.alpha * (p.kind === 'confetti' || p.kind === 'flystar' ? 1 : Math.min(1, a * 1.6));
@@ -373,6 +419,17 @@ function drawP() {
         ctx.fillStyle = '#ffd93b'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#b8860b'; ctx.stroke();
         break;
       case 'z': text('z', p.x, p.y, p.size, '#fff', { stroke: OUT, lw: 5 }); break;
+      case 'flake':
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1.5, p.size * 0.22); ctx.lineCap = 'round';
+        for (let k = 0; k < 3; k++) { ctx.rotate(Math.PI / 3); ctx.beginPath(); ctx.moveTo(-p.size, 0); ctx.lineTo(p.size, 0); ctx.stroke(); }
+        ctx.restore(); break;
+      case 'drop':
+        ctx.beginPath(); ctx.moveTo(p.x, p.y - p.size * 1.6); ctx.quadraticCurveTo(p.x + p.size, p.y, p.x, p.y + p.size); ctx.quadraticCurveTo(p.x - p.size, p.y, p.x, p.y - p.size * 1.6);
+        ctx.fillStyle = '#5ab8ff'; ctx.fill(); break;
+      case 'flower':
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        for (let k = 0; k < 5; k++) { ctx.rotate(TAU / 5); circ(p.size * 0.7, 0, p.size * 0.55, p.col); }
+        circ(0, 0, p.size * 0.45, '#ffd23f'); ctx.restore(); break;
       case 'note': text('♪', p.x, p.y, p.size, p.col, { stroke: OUT, lw: 4, font: 'sans-serif' }); break;
     }
   }
@@ -413,17 +470,20 @@ function comic(str, x, y, col = '#ffd93b', size = 70) {
 const COLORS = [
   ['#ff4747', 'Kırmızı'], ['#ff9f1c', 'Turuncu'], ['#ffd23f', 'Sarı'], ['#4cc95a', 'Yeşil'],
   ['#3d8bff', 'Mavi'], ['#9b5de5', 'Mor'], ['#ff6fb5', 'Pembe'], ['#25c4c4', 'Turkuaz'],
-  ['#f4f4f4', 'Beyaz'], ['#4b4b6e', 'Siyah'],
+  ['#f4f4f4', 'Beyaz'], ['#4b4b6e', 'Siyah'], ['#a3e635', 'Fıstık yeşili'], ['#8b5a2b', 'Kahverengi'],
+  ['#c3cad6', 'Gümüş'], ['#7cc8ff', 'Açık mavi'], ['#2b4c9b', 'Lacivert'], ['#d0a8ff', 'Lila'],
 ];
 const CATS = [
   { key: 'color', icon: '🎨', bg: '#ff6b6b', names: COLORS.map(c => c[1]) },
-  { key: 'pattern', icon: '🐞', bg: '#ffa94d', names: ['Düz', 'Benekli', 'Çizgili', 'Alevli', 'Kalpli', 'Yıldızlı'] },
-  { key: 'body', icon: '🚙', bg: '#ffd43b', names: ['Araba', 'Kamyon', 'Otobüs', 'Yarış arabası', 'Dondurma arabası', 'Ördek araba', 'Pasta araba'] },
-  { key: 'wheels', icon: '', bg: '#69db7c', names: ['Normal tekerlek', 'Kocaman tekerlek', 'Donut tekerlek', 'Kare tekerlek', 'Çiçek tekerlek', 'Karpuz tekerlek'] },
-  { key: 'face', icon: '😜', bg: '#4dabf7', names: ['Mutlu', 'Güneş gözlüğü', 'Yıldız gözler', 'Kalp gözler', 'Uykucu', 'Dil çıkaran', 'Tek göz'] },
-  { key: 'hat', icon: '🎩', bg: '#9775fa', names: ['Şapkasız', 'Taç', 'Parti şapkası', 'Kovboy şapkası', 'Aşçı şapkası', 'Pervane', 'Tavşan kulakları', 'Viking'] },
-  { key: 'trail', icon: '🌈', bg: '#f783ac', names: ['Duman', 'Gökkuşağı', 'Baloncuk', 'Kalpler', 'Yıldızlar', 'Pırt bulutu'] },
-  { key: 'horn', icon: '📯', bg: '#3bc9db', names: ['Düt düt', 'Vak vak', 'Möö', 'Pırt', 'Boing', 'Siren', 'Cik cik'] },
+  { key: 'pattern', icon: '🐞', bg: '#ffa94d', names: ['Düz', 'Benekli', 'Çizgili', 'Alevli', 'Kalpli', 'Yıldızlı', 'Zebra', 'Damalı', 'Şimşekli', 'İnek desenli'] },
+  { key: 'body', icon: '🚙', bg: '#ffd43b', names: ['Araba', 'Kamyon', 'Otobüs', 'Yarış arabası', 'Dondurma arabası', 'Ördek araba', 'Pasta araba', 'İtfaiye', 'Traktör', 'Küvet araba', 'Roket araba', 'Ayakkabı araba'] },
+  { key: 'wheels', icon: '', bg: '#69db7c', names: ['Normal tekerlek', 'Kocaman tekerlek', 'Donut tekerlek', 'Kare tekerlek', 'Çiçek tekerlek', 'Karpuz tekerlek', 'Pizza tekerlek', 'Kurabiye tekerlek', 'Portakal tekerlek', 'Top tekerlek'] },
+  { key: 'face', icon: '😜', bg: '#4dabf7', names: ['Mutlu', 'Güneş gözlüğü', 'Yıldız gözler', 'Kalp gözler', 'Uykucu', 'Dil çıkaran', 'Tek göz', 'Şaşkın', 'Kızgın', 'Robot', 'Bıyıklı', 'Kahkaha'] },
+  { key: 'hat', icon: '🎩', bg: '#9775fa', names: ['Şapkasız', 'Taç', 'Parti şapkası', 'Kovboy şapkası', 'Aşçı şapkası', 'Pervane', 'Tavşan kulakları', 'Viking', 'Korsan şapkası', 'Cadı şapkası', 'Baret', 'Saksı çiçek', 'Lastik ördek', 'Noel Baba şapkası', 'Tek boynuz', 'Palyaço peruğu'] },
+  { key: 'trail', icon: '🌈', bg: '#f783ac', names: ['Duman', 'Gökkuşağı', 'Baloncuk', 'Kalpler', 'Yıldızlar', 'Pırt bulutu', 'Notalar', 'Konfeti', 'Ateş', 'Kar taneleri', 'Su damlaları', 'Çiçekler'],
+    icons: ['💨', '🌈', '🫧', '💖', '⭐', '🤭', '🎵', '🎉', '🔥', '❄️', '💧', '🌸'] },
+  { key: 'horn', icon: '📯', bg: '#3bc9db', names: ['Düt düt', 'Vak vak', 'Möö', 'Pırt', 'Boing', 'Siren', 'Cik cik', 'Miyav', 'Hav hav', 'Tren düdüğü', 'Aslan', 'Ding dong', 'Şarkı'],
+    icons: ['📯', '🦆', '🐄', '💨', '🌀', '🚨', '🐦', '🐱', '🐶', '🚂', '🦁', '🔔', '🎵'] },
 ];
 const CAT = {}; CATS.forEach((c, i) => { CAT[c.key] = c; c.idx = i; });
 
@@ -622,9 +682,116 @@ const BODIES = [
       }
     },
   },
+  { // 7 itfaiye
+    wheels: [-118, -52, 100], eye: { x: 102, y: -127, s: 0.8 }, mouth: { x: 128, y: -55, s: 0.8 },
+    hat: { x: 70, y: -165 }, trail: { x: -164, y: -42 },
+    path() { rr(-164, -132, 222, 107, 14); rr(40, -165, 112, 140, 22); },
+    details(c, t) {
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(-160, -72, 316, 10);
+      // merdiven
+      ctx.beginPath(); rr(-156, -152, 186, 16, 4); ctx.fillStyle = '#dfe4ea'; ctx.fill(); ctx.stroke();
+      for (let x = -144; x < 24; x += 22) { ctx.beginPath(); ctx.moveTo(x, -152); ctx.lineTo(x, -136); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(-150, -134); ctx.lineTo(-150, -150); ctx.stroke();
+      // hortum makarası
+      circ(-62, -98, 26, '#c3cad6', true); ctx.beginPath();
+      for (let a = 0; a < 16; a += 0.4) ctx.lineTo(-62 + Math.cos(a) * a * 1.4, -98 + Math.sin(a) * a * 1.4); ctx.stroke();
+      ctx.beginPath(); rr(64, -153, 70, 52, 14); glass();
+      // tepe lambası
+      const on = Math.floor(t * 6) % 2;
+      ctx.beginPath(); ctx.arc(126, -165, 12, Math.PI, TAU); ctx.closePath(); ctx.fillStyle = on ? '#ff3b3b' : '#3d8bff'; ctx.fill(); ctx.stroke();
+      if (on) { ctx.fillStyle = 'rgba(255,80,80,0.3)'; circ(126, -172, 26, 'rgba(255,80,80,0.3)'); }
+      light(148, -78, 9, '#fff7a8');
+    },
+  },
+  { // 8 traktör
+    wheels: [-62, 100], wscale: [1.6, 1], eye: { x: -64, y: -162, s: 0.85 }, mouth: { x: 132, y: -66, s: 0.8 },
+    hat: { x: -64, y: -206 }, trail: { x: 104, y: -168 },
+    back() {
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      ctx.beginPath(); rr(98, -166, 12, 52, 3); ctx.fillStyle = '#555'; ctx.fill(); ctx.stroke();
+    },
+    path() { rr(-122, -206, 116, 140, 16); rr(-20, -124, 162, 84, 16); },
+    details() {
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      ctx.beginPath(); rr(-108, -192, 88, 64, 10); glass();
+      for (let y = -112; y < -50; y += 12) { ctx.beginPath(); ctx.moveTo(122, y); ctx.lineTo(140, y); ctx.stroke(); }
+      light(140, -100, 8, '#fff7a8');
+    },
+  },
+  { // 9 küvet
+    wheels: [-92, 92], eye: { x: 30, y: -90, s: 0.9 }, mouth: { x: 30, y: -52, s: 0.9 },
+    hat: { x: 30, y: -150 }, trail: { x: -146, y: -70 },
+    back(c, t) {
+      ctx.lineWidth = 5; ctx.strokeStyle = OUT;
+      ctx.beginPath(); ctx.moveTo(-128, -128); ctx.lineTo(-128, -190); ctx.quadraticCurveTo(-128, -210, -104, -210); ctx.lineTo(-86, -210);
+      ctx.lineWidth = 12; ctx.strokeStyle = OUT; ctx.stroke(); ctx.lineWidth = 7; ctx.strokeStyle = '#c3cad6'; ctx.stroke();
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT; ell(-82, -204, 14, 6, 0, '#c3cad6', true);
+      for (let i = 0; i < 3; i++) { const k = (t * 1.5 + i / 3) % 1; ctx.fillStyle = '#6fc3ff'; circ(-86 + (i - 1) * 6, -196 + k * 60, 3, '#6fc3ff'); }
+    },
+    path() {
+      rr(-152, -134, 304, 18, 9);
+      ctx.moveTo(-140, -122); ctx.lineTo(140, -122); ctx.lineTo(132, -62); ctx.quadraticCurveTo(124, -28, 84, -28);
+      ctx.lineTo(-84, -28); ctx.quadraticCurveTo(-124, -28, -132, -62); ctx.closePath();
+    },
+    details(c, t) {
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      // köpükler
+      for (let i = 0; i < 9; i++) { const x = -120 + i * 30, y = -140 - hash(i) * 14 + Math.sin(t * 3 + i) * 2; circ(x, y, 17 + hash(i + 3) * 6, '#fff', true); }
+      ctx.fillStyle = '#fff'; ctx.fillRect(-130, -146, 260, 12);
+      // minik lastik ördek
+      ctx.save(); ctx.translate(-70, -150 + Math.sin(t * 4) * 2);
+      ell(0, 0, 18, 12, 0, '#ffe14d', true); circ(10, -14, 10, '#ffe14d', true);
+      ctx.beginPath(); ctx.moveTo(18, -15); ctx.lineTo(28, -12); ctx.lineTo(18, -9); ctx.closePath(); ctx.fillStyle = '#ff9a1f'; ctx.fill(); ctx.stroke();
+      circ(12, -17, 2, OUT); ctx.restore();
+      for (const x of [-60, 60]) { ctx.beginPath(); ctx.moveTo(x - 10, -30); ctx.lineTo(x - 14, -18); ctx.lineTo(x + 14, -18); ctx.lineTo(x + 10, -30); ctx.closePath(); ctx.fillStyle = '#ffcc33'; ctx.fill(); ctx.stroke(); }
+    },
+  },
+  { // 10 roket
+    wheels: [-72, 80], eye: { x: 52, y: -88, s: 0.66 }, mouth: null,
+    hat: { x: 30, y: -132 }, trail: { x: -160, y: -86 },
+    back(c, t, col) {
+      ctx.lineWidth = 5; ctx.strokeStyle = OUT;
+      ctx.beginPath(); ctx.moveTo(-90, -130); ctx.lineTo(-150, -180); ctx.lineTo(-150, -128); ctx.closePath(); ctx.fillStyle = '#ff4747'; ctx.fill(); ctx.stroke();
+      // ateş
+      const f = 1 + Math.sin(t * 30) * 0.2;
+      ctx.beginPath(); ctx.moveTo(-126, -120); ctx.quadraticCurveTo(-170 - 40 * f, -86, -126, -50); ctx.closePath(); ctx.fillStyle = '#ff6a00'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-126, -108); ctx.quadraticCurveTo(-150 - 24 * f, -86, -126, -62); ctx.closePath(); ctx.fillStyle = '#ffd000'; ctx.fill();
+    },
+    path() {
+      ctx.moveTo(-128, -40); ctx.lineTo(-128, -132); ctx.lineTo(60, -132);
+      ctx.quadraticCurveTo(150, -124, 168, -86); ctx.quadraticCurveTo(150, -48, 60, -40); ctx.closePath();
+    },
+    details() {
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      ctx.beginPath(); ctx.moveTo(116, -126); ctx.quadraticCurveTo(150, -118, 168, -86); ctx.quadraticCurveTo(150, -54, 116, -46);
+      ctx.quadraticCurveTo(128, -86, 116, -126); ctx.closePath(); ctx.fillStyle = '#ff4747'; ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 6; circ(52, -88, 30, '#c3cad6', true); ctx.lineWidth = 4; circ(52, -88, 22, GLASS, true);
+      for (const x of [-100, -40]) circ(x, -86, 6, '#c3cad6', true);
+      ctx.beginPath(); ctx.moveTo(-60, -40); ctx.lineTo(-100, -14); ctx.lineTo(-30, -40); ctx.closePath(); ctx.fillStyle = '#ff4747'; ctx.fill(); ctx.stroke();
+    },
+  },
+  { // 11 ayakkabı
+    wheels: [-92, 96], eye: { x: 84, y: -86, s: 0.72 }, mouth: { x: 132, y: -54, s: 0.7 },
+    hat: { x: -82, y: -170 }, trail: { x: -146, y: -70 },
+    path() {
+      ctx.moveTo(-142, -30); ctx.lineTo(-142, -150); ctx.quadraticCurveTo(-142, -172, -116, -172); ctx.lineTo(-44, -172);
+      ctx.quadraticCurveTo(-24, -172, -20, -150); ctx.lineTo(-12, -112); ctx.quadraticCurveTo(64, -106, 122, -86);
+      ctx.quadraticCurveTo(162, -70, 156, -30); ctx.closePath();
+    },
+    details() {
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      ell(-80, -170, 52, 9, 0, '#5a3d2b', true);
+      ctx.beginPath(); rr(-150, -44, 314, 18, 9); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 5; ctx.strokeStyle = '#fff';
+      for (let i = 0; i < 4; i++) { const x = -16 + i * 18; ctx.beginPath(); ctx.moveTo(x - 8, -140 + i * 8); ctx.lineTo(x + 10, -112 + i * 4); ctx.stroke(); }
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      starPath(-80, -96, 26, 12); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+    },
+  },
 ];
 
-const WHEEL_R = [30, 50, 33, 30, 34, 34];
+const WHEEL_R = [30, 50, 33, 30, 34, 34, 34, 32, 33, 34];
 
 function drawWheel(type, x, y, r, a) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(a);
@@ -689,6 +856,37 @@ function drawWheel(type, x, y, r, a) {
       }
       ctx.lineWidth = 4; ctx.strokeStyle = OUT; circ(0, 0, r, null, true);
       break;
+    case 6: // pizza
+      circ(0, 0, r, '#d98c3f', true);
+      circ(0, 0, r * 0.8, '#ffd65c');
+      ctx.lineWidth = 2; ctx.strokeStyle = '#c47f3a';
+      for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(i * TAU / 6) * r * 0.8, Math.sin(i * TAU / 6) * r * 0.8); ctx.stroke(); }
+      for (let i = 0; i < 6; i++) { const an = i * TAU / 6 + 0.5; circ(Math.cos(an) * r * 0.5, Math.sin(an) * r * 0.5, r * 0.13, '#d63a3a'); }
+      circ(0, 0, r * 0.12, '#4cc95a');
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT; circ(0, 0, r, null, true);
+      break;
+    case 7: // kurabiye
+      ctx.beginPath();
+      for (let i = 0; i <= 30; i++) { const an = i / 30 * TAU; const rad = r * (0.95 + Math.sin(an * 7) * 0.05); ctx.lineTo(Math.cos(an) * rad, Math.sin(an) * rad); }
+      ctx.closePath(); ctx.fillStyle = '#d9a066'; ctx.fill(); ctx.stroke();
+      for (let i = 0; i < 7; i++) { const an = i * 2.1, rad = r * (0.25 + (i % 3) * 0.2); ell(Math.cos(an) * rad, Math.sin(an) * rad, r * 0.12, r * 0.09, an, '#5a3418'); }
+      break;
+    case 8: // portakal
+      circ(0, 0, r, '#ff9a1f', true);
+      circ(0, 0, r * 0.84, '#ffe2a8');
+      for (let i = 0; i < 8; i++) {
+        const a0 = i * TAU / 8 + 0.06, a1 = (i + 1) * TAU / 8 - 0.06;
+        ctx.beginPath(); ctx.moveTo(Math.cos((a0 + a1) / 2) * r * 0.12, Math.sin((a0 + a1) / 2) * r * 0.12); ctx.arc(0, 0, r * 0.76, a0, a1); ctx.closePath();
+        ctx.fillStyle = '#ffb33a'; ctx.fill();
+      }
+      ctx.lineWidth = 4; circ(0, 0, r, null, true);
+      break;
+    case 9: { // plaj topu
+      const bc = ['#ff4747', '#fff', '#3d8bff', '#ffd23f', '#fff', '#4cc95a'];
+      for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, i * TAU / 6, (i + 1) * TAU / 6); ctx.closePath(); ctx.fillStyle = bc[i]; ctx.fill(); }
+      ctx.lineWidth = 4; circ(0, 0, r, null, true); circ(0, 0, r * 0.18, '#fff', true);
+      break;
+    }
   }
   ctx.restore();
 }
@@ -723,6 +921,28 @@ function drawPattern(i, col, t) {
   } else if (i === 5) {
     for (let gy = -320, r = 0; gy <= 0; gy += 42, r++) {
       for (let gx = -190; gx <= 190; gx += 50) { starPath(gx + (r % 2) * 25, gy, 12, 5.5, 5, -Math.PI / 2 + gx); ctx.fillStyle = lum(col) > 0.72 ? '#ffb000' : '#fff27a'; ctx.fill(); }
+    }
+  } else if (i === 6) { // zebra
+    ctx.fillStyle = lum(col) > 0.35 ? 'rgba(30,28,40,0.75)' : 'rgba(255,255,255,0.8)';
+    for (let x = -200; x < 200; x += 44) {
+      ctx.beginPath(); ctx.moveTo(x, -340);
+      for (let y = -340; y <= 10; y += 20) ctx.lineTo(x + Math.sin(y * 0.05 + x) * 10, y);
+      for (let y = 10; y >= -340; y -= 20) ctx.lineTo(x + 16 + Math.sin(y * 0.05 + x + 1) * 8, y);
+      ctx.closePath(); ctx.fill();
+    }
+  } else if (i === 7) { // dama
+    for (let y = -340, r = 0; y < 10; y += 26, r++) for (let x = -208, c = 0; x < 210; x += 26, c++) if ((r + c) % 2) ctx.fillRect(x, y, 26, 26);
+  } else if (i === 8) { // şimşek
+    for (const [x, y] of [[-110, -70], [-30, -110], [50, -70], [-70, -150], [110, -120]]) {
+      ctx.beginPath(); ctx.moveTo(x + 6, y - 30); ctx.lineTo(x - 12, y + 4); ctx.lineTo(x, y + 4); ctx.lineTo(x - 6, y + 30); ctx.lineTo(x + 14, y - 6); ctx.lineTo(x + 2, y - 6); ctx.lineTo(x + 10, y - 30); ctx.closePath();
+      ctx.fillStyle = '#ffe14d'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.stroke();
+    }
+  } else if (i === 9) { // inek
+    const cc = lum(col) > 0.3 ? '#2d2a3a' : '#fff';
+    for (const [x, y, r0] of [[-100, -80, 22], [-20, -140, 18], [40, -70, 26], [110, -110, 16], [-60, -170, 14], [90, -50, 12], [-140, -130, 15]]) {
+      ctx.fillStyle = cc; ctx.beginPath();
+      for (let k = 0; k <= 12; k++) { const a = k / 12 * TAU; const rad = r0 * (0.8 + hash(x + k) * 0.5); ctx.lineTo(x + Math.cos(a) * rad * 1.2, y + Math.sin(a) * rad); }
+      ctx.fill();
     }
   }
 }
@@ -780,6 +1000,30 @@ function drawFace(c, B, t, honk) {
       ctx.lineWidth = 3;
       for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(i * 10, -21); ctx.lineTo(i * 15, -31); ctx.stroke(); }
       break;
+    case 7: // şaşkın
+      for (const x of [-16, 16]) { circ(x, 0, 16, '#fff', true); circ(x + 2, 0, 4, OUT); }
+      ctx.lineWidth = 3; for (const x of [-16, 16]) { ctx.beginPath(); ctx.arc(x, -10, 14, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke(); }
+      break;
+    case 8: // kızgın (komik)
+      eyeBall(-15, 2, 12, look.x * 0.5, 0.3, 1); eyeBall(15, 2, 12, look.x * 0.5, 0.3, 1);
+      ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-28, -16); ctx.lineTo(-4, -8); ctx.moveTo(28, -16); ctx.lineTo(4, -8); ctx.stroke();
+      break;
+    case 9: { // robot
+      const g = 0.6 + Math.sin(t * 6) * 0.4;
+      for (const x of [-16, 16]) { ctx.beginPath(); rr(x - 12, -10, 24, 20, 4); ctx.fillStyle = '#2d2a3a'; ctx.fill(); ctx.stroke();
+        ctx.fillStyle = `rgba(80,255,240,${g})`; ctx.fillRect(x - 8, -5, 16, 10); }
+      ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(0, -26); ctx.stroke(); circ(0, -28, 4, Math.floor(t * 3) % 2 ? '#ff4747' : '#ffd23f', true);
+      break;
+    }
+    case 10: // bıyıklı
+      eyeBall(-15, 0, 12, look.x, look.y, blink); eyeBall(15, 0, 12, look.x, look.y, blink);
+      ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-28, -16); ctx.lineTo(-6, -18); ctx.moveTo(28, -16); ctx.lineTo(6, -18); ctx.stroke();
+      break;
+    case 11: // kahkaha
+      ctx.lineWidth = 4.5;
+      for (const x of [-15, 15]) { ctx.beginPath(); ctx.moveTo(x - 10, 4); ctx.lineTo(x, -6); ctx.lineTo(x + 10, 4); ctx.stroke(); }
+      for (const x of [-22, 22]) { const k = (t * 1.5) % 1; ctx.fillStyle = '#6fc3ff'; circ(x * 1.2, 8 + k * 20, 4 * (1 - k), '#6fc3ff'); }
+      break;
   }
   ctx.restore();
 
@@ -809,10 +1053,26 @@ function drawFace(c, B, t, honk) {
       ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(0, 12); ctx.lineWidth = 2; ctx.stroke();
       ctx.restore(); break;
     }
-    case 6:
+    case 6: case 8:
       ctx.beginPath(); ctx.moveTo(-15, -4); ctx.quadraticCurveTo(0, 16, 15, -4); ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
       ctx.lineWidth = 2; for (const x of [-6, 0, 6]) { ctx.beginPath(); ctx.moveTo(x, -3); ctx.lineTo(x, 5); ctx.stroke(); }
       break;
+    case 7: ell(0, 0, 7, 9, 0, '#7a1f2b', true); break;
+    case 9: ctx.beginPath(); rr(-14, -6, 28, 12, 3); ctx.fillStyle = '#c3cad6'; ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 2; for (const x of [-7, 0, 7]) { ctx.beginPath(); ctx.moveTo(x, -6); ctx.lineTo(x, 6); ctx.stroke(); } break;
+    case 10:
+      ctx.beginPath(); ctx.arc(0, -2, 10, 0.3, Math.PI - 0.3); ctx.stroke();
+      ctx.save(); ctx.translate(0, -12); ctx.rotate(Math.sin(t * 6) * 0.08);
+      ctx.beginPath(); ctx.moveTo(0, -2); ctx.bezierCurveTo(-10, -10, -26, -6, -30, 4); ctx.bezierCurveTo(-22, 0, -12, 6, 0, 2);
+      ctx.bezierCurveTo(12, 6, 22, 0, 30, 4); ctx.bezierCurveTo(26, -6, 10, -10, 0, -2); ctx.closePath();
+      ctx.fillStyle = '#5a3418'; ctx.fill(); ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+      break;
+    case 11: {
+      const o = 0.8 + Math.sin(t * 18) * 0.2;
+      ctx.beginPath(); ctx.moveTo(-16, -6); ctx.lineTo(16, -6); ctx.quadraticCurveTo(14, 16 * o, 0, 16 * o); ctx.quadraticCurveTo(-14, 16 * o, -16, -6); ctx.closePath();
+      ctx.fillStyle = '#7a1f2b'; ctx.fill(); ctx.stroke(); ell(0, 9 * o, 7, 4, 0, '#ff7a8a'); ctx.fillStyle = '#fff'; ctx.fillRect(-12, -5, 24, 4);
+      break;
+    }
     default: ctx.beginPath(); ctx.arc(0, -6, 13, 0.25, Math.PI - 0.25); ctx.stroke();
       ctx.fillStyle = 'rgba(255,110,140,0.45)'; circ(-18, -6, 6, 'rgba(255,110,140,0.45)'); circ(18, -6, 6, 'rgba(255,110,140,0.45)');
   }
@@ -878,6 +1138,72 @@ function drawHat(i, t) {
       ctx.beginPath(); rr(-32, -8, 64, 10, 4); ctx.fillStyle = '#ffcc33'; ctx.fill(); ctx.stroke();
       for (const x of [-18, 0, 18]) circ(x, -3, 2.5, OUT);
       break;
+    case 8: // korsan
+      ctx.beginPath(); ctx.moveTo(-54, -4); ctx.quadraticCurveTo(-40, -60, 0, -56); ctx.quadraticCurveTo(40, -60, 54, -4); ctx.quadraticCurveTo(0, -18, -54, -4); ctx.closePath();
+      ctx.fillStyle = '#2d2a3a'; ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-46, -10); ctx.quadraticCurveTo(0, -24, 46, -10); ctx.stroke();
+      circ(0, -36, 9, '#fff'); ctx.fillStyle = '#fff'; ctx.fillRect(-5, -30, 10, 7);
+      circ(-3, -37, 2.5, OUT); circ(3, -37, 2.5, OUT);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-12, -22); ctx.lineTo(12, -14); ctx.moveTo(12, -22); ctx.lineTo(-12, -14); ctx.stroke();
+      break;
+    case 9: // cadı
+      ctx.beginPath(); ctx.moveTo(-24, -10); ctx.lineTo(4, -74); ctx.quadraticCurveTo(22, -86, 30, -70); ctx.quadraticCurveTo(18, -74, 14, -64); ctx.lineTo(24, -10); ctx.closePath();
+      ctx.fillStyle = '#7b4bc4'; ctx.fill(); ctx.stroke();
+      ell(0, -6, 52, 9, 0, '#7b4bc4', true);
+      ctx.fillStyle = '#4cc95a'; ctx.fillRect(-23, -22, 46, 9);
+      starPath(2, -44, 9, 4); ctx.fillStyle = '#ffd23f'; ctx.fill();
+      break;
+    case 10: // baret
+      ctx.beginPath(); ctx.arc(0, -4, 30, Math.PI, TAU); ctx.closePath(); ctx.fillStyle = '#ffcc00'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); rr(-40, -8, 80, 10, 5); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); rr(-6, -34, 12, 28, 4); ctx.fillStyle = '#ffe066'; ctx.fill(); ctx.stroke();
+      circ(18, -20, 6, '#fff7a8', true);
+      break;
+    case 11: { // saksı çiçek
+      ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(-28, -34); ctx.lineTo(28, -34); ctx.lineTo(22, 0); ctx.closePath(); ctx.fillStyle = '#d9773a'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); rr(-32, -42, 64, 12, 4); ctx.fill(); ctx.stroke();
+      const sw = Math.sin(t * 3) * 0.15;
+      ctx.save(); ctx.translate(0, -42); ctx.rotate(sw);
+      ctx.strokeStyle = '#2f9e44'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -46); ctx.stroke();
+      ell(10, -22, 12, 6, -0.5, '#4cc95a');
+      ctx.strokeStyle = OUT; ctx.lineWidth = 3;
+      for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + t; ell(Math.cos(a) * 14, -50 + Math.sin(a) * 14, 11, 7, a, '#ff6fb5', true); }
+      circ(0, -50, 9, '#ffd23f', true);
+      ctx.restore();
+      break;
+    }
+    case 12: { // lastik ördek
+      const b = Math.sin(t * 5) * 3;
+      ctx.save(); ctx.translate(0, b);
+      ell(0, -18, 30, 18, 0, '#ffe14d', true);
+      ctx.beginPath(); ctx.moveTo(-26, -24); ctx.lineTo(-40, -36); ctx.lineTo(-24, -32); ctx.closePath(); ctx.fillStyle = '#ffe14d'; ctx.fill(); ctx.stroke();
+      circ(12, -42, 16, '#ffe14d', true);
+      ctx.beginPath(); ctx.moveTo(26, -44); ctx.quadraticCurveTo(42, -42, 40, -36); ctx.quadraticCurveTo(32, -32, 26, -36); ctx.closePath(); ctx.fillStyle = '#ff9a1f'; ctx.fill(); ctx.stroke();
+      circ(16, -46, 3, OUT);
+      ctx.restore();
+      break;
+    }
+    case 13: // noel baba
+      ctx.beginPath(); ctx.moveTo(-26, -8); ctx.quadraticCurveTo(-10, -70, 30, -60); ctx.quadraticCurveTo(40, -54, 44, -36); ctx.quadraticCurveTo(20, -46, 26, -8); ctx.closePath();
+      ctx.fillStyle = '#ff3b3b'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); rr(-32, -14, 64, 16, 8); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+      circ(44, -34, 10, '#fff', true);
+      break;
+    case 14: { // tek boynuz
+      ctx.fillStyle = '#ff6fb5';
+      for (let i = 0; i < 4; i++) { ell(-22 - i * 6, -6 + i * 8, 10, 14, 0.5, ['#ff6fb5', '#ffd23f', '#6fe3ff', '#b388ff'][i], true); }
+      ctx.beginPath(); ctx.moveTo(-14, -4); ctx.lineTo(4, -78); ctx.lineTo(16, -4); ctx.closePath(); ctx.fillStyle = '#ffd23f'; ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 3; for (let k = 1; k < 4; k++) { const y = -4 - k * 18; ctx.beginPath(); ctx.moveTo(-12 + k * 4, y + 6); ctx.lineTo(14 - k * 3, y - 2); ctx.stroke(); }
+      circ(4, -80, 4, '#fff');
+      break;
+    }
+    case 15: { // palyaço peruğu
+      const pc = ['#ff4747', '#ffd23f', '#4cc95a', '#3d8bff', '#ff6fb5', '#ff9f1c', '#9b5de5'];
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 9; i++) { const a = Math.PI + (i / 8) * Math.PI; circ(Math.cos(a) * 38, -6 + Math.sin(a) * 30, 17 + Math.sin(t * 6 + i) * 1.5, pc[i % 7], true); }
+      circ(0, -30, 22, pc[3], true);
+      break;
+    }
   }
 }
 
@@ -926,7 +1252,8 @@ function drawCar(c, x, y, s, o = {}) {
     drawHat(c.hat, t); ctx.restore();
   }
   // tekerlekler
-  for (const wx of wheelXs(c)) drawWheel(c.wheels, wx, -wr + lift, wr, c.wheelA);
+  const ws = wheelXs(c), wsc = B.wscale && ws.length === B.wheels.length ? B.wscale : null;
+  ws.forEach((wx, i) => { const k = wsc ? wsc[i] : 1; drawWheel(c.wheels, wx, -wr * k + lift, wr * k, c.wheelA / k); });
   ctx.restore();
 }
 
@@ -944,20 +1271,22 @@ function carTop(c, x, y, s) {
 function emitTrail(c, x, y, s, dt, worldVX, acc) {
   const a = carAnchor(c, x, y, s, 'trail');
   c.trailAcc = (c.trailAcc || 0) + dt;
-  const every = [0.07, 0.016, 0.07, 0.11, 0.09, 0.09][c.trail];
+  const every = [0.07, 0.016, 0.07, 0.11, 0.09, 0.09, 0.14, 0.05, 0.02, 0.08, 0.05, 0.1][c.trail];
   while (c.trailAcc > every) {
     c.trailAcc -= every;
     switch (c.trail) {
       case 0: addP({ x: a.x, y: a.y, vx: worldVX - 40, vy: rand(-30, -10), size: rand(6, 10) * s * 1.6, grow: 30 * s, life: 0.8, col: 'rgba(200,200,210,0.8)' }); break;
-      case 1: {
-        const rc = ['#ff4747', '#ff9f1c', '#ffd23f', '#4cc95a', '#3d8bff', '#9b5de5'];
-        for (let k = 0; k < 6; k++) addP({ kind: 'rect', x: a.x, y: a.y - 26 * s + k * 9 * s, vx: worldVX - 30, vy: 0, size: Math.max(4, (Math.abs(worldVX) + 40) * every + 2), h: 9.5 * s, life: 0.7, col: rc[k] });
-        break;
-      }
+      case 1: RIB.push({ x: a.x, y: a.y, vx: worldVX - 30, life: 0.7, s }); break;
       case 2: addP({ kind: 'bubble', x: a.x, y: a.y, vx: worldVX * 0.6 - 30 + rand(-20, 20), vy: rand(-90, -40), size: rand(6, 14) * s * 1.5, life: 1.2 }); break;
       case 3: addP({ kind: 'heart', x: a.x, y: a.y, vx: worldVX * 0.6 - 30, vy: rand(-90, -50), size: rand(7, 11) * s * 1.5, life: 1.1, col: pick(['#ff4d79', '#ff8fb8', '#ff2f5f']) }); break;
       case 4: addP({ kind: 'star', x: a.x, y: a.y, vx: worldVX * 0.6 - 40, vy: rand(-80, -20), size: rand(7, 12) * s * 1.5, life: 1.0, col: pick(['#ffd93b', '#fff27a', '#ffb000']), vr: rand(-6, 6) }); break;
       case 5: addP({ x: a.x, y: a.y, vx: worldVX * 0.5 - 50, vy: rand(-30, 0), size: rand(10, 16) * s * 1.6, grow: 40 * s, life: 0.9, col: pick(['rgba(140,200,60,0.75)', 'rgba(170,220,80,0.7)', 'rgba(110,170,40,0.7)']) }); break;
+      case 6: addP({ kind: 'note', x: a.x, y: a.y, vx: worldVX * 0.6 - 30, vy: rand(-90, -50), size: rand(22, 32) * s * 1.4, life: 1.2, col: pick(['#ff6fb5', '#3d8bff', '#9b5de5', '#ff9f1c']) }); break;
+      case 7: addP({ kind: 'confetti', x: a.x, y: a.y, vx: worldVX * 0.6 + rand(-80, 20), vy: rand(-200, -60), g: 300, size: rand(8, 13) * s * 1.4, life: 1.1, col: pick(['#ff4747', '#ffd23f', '#4cc95a', '#3d8bff', '#ff6fb5']), rot: rand(0, TAU), vr: rand(-8, 8) }); break;
+      case 8: addP({ x: a.x, y: a.y + rand(-6, 6) * s, vx: worldVX - 120, vy: rand(-40, 10), size: rand(10, 16) * s * 1.4, grow: -18 * s, life: 0.45, col: pick(['#ff6a00', '#ffd000', '#ff3b00', '#ffae00']) }); break;
+      case 9: addP({ kind: 'flake', x: a.x, y: a.y, vx: worldVX * 0.6 - 30, vy: rand(-60, 20), size: rand(7, 11) * s * 1.5, life: 1.2, vr: rand(-3, 3) }); break;
+      case 10: addP({ kind: 'drop', x: a.x, y: a.y, vx: worldVX * 0.7 - 60 + rand(-30, 30), vy: rand(-220, -100), g: 900, size: rand(5, 8) * s * 1.5, life: 0.9 }); break;
+      case 11: addP({ kind: 'flower', x: a.x, y: a.y, vx: worldVX * 0.6 - 30, vy: rand(-70, -20), size: rand(7, 10) * s * 1.5, life: 1.2, vr: rand(-4, 4), col: pick(['#ff6fb5', '#ffffff', '#b388ff', '#ffd23f']) }); break;
     }
   }
 }
@@ -1049,36 +1378,64 @@ function drawHills(off, baseY, amp, col, f) {
   }
   ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
 }
-function drawTree(x, y, s, k) {
+function drawTree(x, y, s, k, snow) {
   ctx.lineWidth = 4; ctx.strokeStyle = OUT;
   ctx.beginPath(); rr(x - 7 * s, y - 50 * s, 14 * s, 50 * s, 4); ctx.fillStyle = '#9a6a3a'; ctx.fill(); ctx.stroke();
   const g = ['#3fae49', '#56c35b', '#2f9e44'][k % 3];
   if (k % 2) { circ(x, y - 72 * s, 34 * s, g, true); circ(x - 10 * s, y - 80 * s, 8 * s, 'rgba(255,255,255,0.25)'); for (let i = 0; i < 3; i++) circ(x + (i - 1) * 16 * s, y - 64 * s + (i % 2) * 14 * s, 5 * s, '#ff4d5e'); }
   else { ctx.beginPath(); ctx.moveTo(x - 32 * s, y - 38 * s); ctx.lineTo(x, y - 120 * s); ctx.lineTo(x + 32 * s, y - 38 * s); ctx.closePath(); ctx.fillStyle = g; ctx.fill(); ctx.stroke(); }
+  if (snow) {
+    if (k % 2) { ctx.beginPath(); ctx.arc(x, y - 72 * s, 34 * s, Math.PI * 1.1, Math.PI * 1.9); ctx.lineWidth = 10 * s; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+    else { ctx.beginPath(); ctx.moveTo(x - 12 * s, y - 92 * s); ctx.lineTo(x, y - 120 * s); ctx.lineTo(x + 12 * s, y - 92 * s); ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); }
+  }
 }
-function drawHouse(x, y, k) {
+function drawHouse(x, y, k, night, snow) {
   ctx.lineWidth = 4; ctx.strokeStyle = OUT;
   const c = ['#ffd6a5', '#caffbf', '#a0c4ff', '#ffc6ff'][k % 4];
   ctx.beginPath(); rr(x - 50, y - 80, 100, 80, 4); ctx.fillStyle = c; ctx.fill(); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x - 62, y - 78); ctx.lineTo(x, y - 128); ctx.lineTo(x + 62, y - 78); ctx.closePath(); ctx.fillStyle = '#ff6b6b'; ctx.fill(); ctx.stroke();
-  ctx.beginPath(); rr(x - 34, y - 62, 26, 24, 3); ctx.fillStyle = GLASS; ctx.fill(); ctx.stroke();
+  if (snow) { ctx.beginPath(); ctx.moveTo(x - 62, y - 78); ctx.lineTo(x, y - 128); ctx.lineTo(x + 62, y - 78); ctx.lineTo(x + 44, y - 86); ctx.lineTo(x, y - 116); ctx.lineTo(x - 44, y - 86); ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); }
+  ctx.beginPath(); rr(x - 34, y - 62, 26, 24, 3); ctx.fillStyle = night ? '#ffe066' : GLASS; ctx.fill(); ctx.stroke();
   ctx.beginPath(); rr(x + 8, y - 50, 24, 50, 3); ctx.fillStyle = '#9a6a3a'; ctx.fill(); ctx.stroke();
 }
 const ROAD_TOP = 425, ROAD_BOT = 700;
-function drawWorld(dist, t, sunMood) {
-  drawSky();
-  drawSun(1110, 105, t);
+const THEMES = {
+  gunduz: { sky: ['#62bdff', '#d8f3ff'], hills: ['#9fe0a0', '#74cc72'], grass: '#66c466', grass2: '#5fb85f', say: 'Hadi gidelim!' },
+  aksam: { sky: ['#ff7eb3', '#ffd29a'], hills: ['#d7a1d9', '#8fcf7e'], grass: '#76c46a', grass2: '#6ab65e', say: 'Gün batımı yarışı!' },
+  gece: { sky: ['#101848', '#3a3f8f'], hills: ['#2f4f7a', '#2c6b52'], grass: '#2f7d4c', grass2: '#2a6e44', say: 'Gece yarışı!' },
+  kar: { sky: ['#8fcaff', '#eef8ff'], hills: ['#ffffff', '#e3eefa'], grass: '#f4f9ff', grass2: '#e8f1fb', say: 'Karlı yol!' },
+};
+function drawMoon(x, y, t) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(255,250,200,0.15)'; circ(0, 0, 80, 'rgba(255,250,200,0.15)');
+  ctx.lineWidth = 4; ctx.strokeStyle = '#d9cf8f'; circ(0, 0, 50, '#fff6c8', true);
+  circ(18, -18, 8, '#efe3a8'); circ(-20, 20, 6, '#efe3a8');
+  ctx.strokeStyle = OUT; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(-16, -4, 7, 0.2, Math.PI - 0.2); ctx.stroke(); ctx.beginPath(); ctx.arc(16, -4, 7, 0.2, Math.PI - 0.2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 14, 10, 0.3, Math.PI - 0.3); ctx.stroke();
+  ctx.restore();
+}
+function drawWorld(dist, t, theme) {
+  const th = THEMES[theme] || THEMES.gunduz, night = theme === 'gece', snow = theme === 'kar';
+  drawSky(th.sky[0], th.sky[1]);
+  if (night) {
+    for (let i = 0; i < 60; i++) { const tw = 0.5 + Math.sin(t * 3 + i) * 0.5; ctx.globalAlpha = 0.4 + tw * 0.6; circ(hash(i) * W, hash(i + 50) * 360, 1.5 + hash(i + 9) * 2, '#fff'); }
+    ctx.globalAlpha = 1; drawMoon(1110, 105, t);
+  } else if (theme === 'aksam') drawSun(1060, 300, t);
+  else drawSun(1110, 105, t);
+  if (night) ctx.globalAlpha = 0.25;
   drawClouds(dist * 0.06 + t * 12);
-  drawHills(dist * 0.12, 345, 34, '#9fe0a0', 0.0042);
-  drawHills(dist * 0.3, 395, 26, '#74cc72', 0.0065);
+  ctx.globalAlpha = 1;
+  drawHills(dist * 0.12, 345, 34, th.hills[0], 0.0042);
+  drawHills(dist * 0.3, 395, 26, th.hills[1], 0.0065);
   // ağaçlar ve evler
   const off = dist * 0.55, sp = 170;
   for (let k = Math.floor(off / sp) - 1; k * sp - off < W + 100; k++) {
     const x = k * sp - off, h = hash(k);
-    if (h < 0.18) drawHouse(x, 418, k);
-    else if (h < 0.75) drawTree(x + h * 40, 420, 0.8 + h * 0.4, k);
+    if (h < 0.18) drawHouse(x, 418, k, night, snow);
+    else if (h < 0.75) drawTree(x + h * 40, 420, 0.8 + h * 0.4, k, snow);
   }
-  ctx.fillStyle = '#66c466'; ctx.fillRect(0, 405, W, 25);
+  ctx.fillStyle = th.grass; ctx.fillRect(0, 405, W, 25);
   // çiçekler
   for (let k = Math.floor(dist / 60) - 1; k * 60 - dist < W + 40; k++) {
     const x = k * 60 - dist + hash(k * 7) * 40;
@@ -1095,7 +1452,15 @@ function drawWorld(dist, t, sunMood) {
   const dOff = dist % 100;
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   for (let x = -dOff; x < W; x += 100) { ctx.fillRect(x, 512, 54, 7); ctx.fillRect(x, 606, 54, 7); }
-  ctx.fillStyle = '#5fb85f'; ctx.fillRect(0, ROAD_BOT + 8, W, H - ROAD_BOT);
+  ctx.fillStyle = th.grass2; ctx.fillRect(0, ROAD_BOT + 8, W, H - ROAD_BOT);
+  if (snow) {
+    for (let i = 0; i < 70; i++) {
+      const sp2 = 30 + hash(i) * 50;
+      const x = ((hash(i + 3) * W - t * 25 - dist * 0.3 * hash(i + 1)) % W + W) % W;
+      const y = ((hash(i + 7) * H + t * sp2) % H);
+      circ(x + Math.sin(t * 2 + i) * 8, y, 2 + hash(i + 11) * 3, 'rgba(255,255,255,0.9)');
+    }
+  }
 }
 
 // ============================================================ hayvanlar ve yol nesneleri
@@ -1201,7 +1566,7 @@ const ANIMAL_TXT = { inek: 'MÖÖ!', ordek: 'VAK!', tavuk: 'GIDAK!', domuz: 'Oİ
 
 // ============================================================ sahneler
 let scene = null;
-function go(s) { if (scene && scene.exit) scene.exit(); scene = s; P = []; if (s.enter) s.enter(); }
+function go(s) { if (scene && scene.exit) scene.exit(); scene = s; P = []; RIB = []; if (s.enter) s.enter(); }
 const car = newCar();
 
 // ---------------- Başlık
@@ -1222,7 +1587,7 @@ const Title = {
   },
   draw() {
     const t = this.t;
-    drawWorld(t * 300, t);
+    drawWorld(t * 300, t, 'gunduz');
     ell(640, 545, 170, 18, 0, 'rgba(0,0,0,0.2)');
     drawP();
     drawCar(this.car, 640, 540, 1.05, { t, bob: Math.sin(t * 10) * 3 });
@@ -1259,12 +1624,14 @@ const Garage = {
     this.dice = new Button({ x: 520, y: 652, r: 50, bg: '#ff922b', icon: '🎲', onClick: () => this.randomAll() });
     this.goBtn = new Button({ x: 770, y: 650, r: 62, bg: '#40c057', icon: '🏁', onClick: () => this.start() });
     this.btns.push(this.dice, this.goBtn);
+    this.picker = null;
+    this.pickClose = new Button({ x: 1090, y: 120, r: 34, bg: '#ff6b6b', icon: '✖️' });
     Music.play('garage');
     say('Arabanı değiştir!', true);
   },
   catButton(ci, x, y) {
     const cat = CATS[ci];
-    const b = new Button({ x, y, r: 58, bg: cat.bg, icon: cat.icon, onClick: () => this.change(cat.key, +1) });
+    const b = new Button({ x, y, r: 58, bg: cat.bg, icon: cat.icon, onClick: () => this.openPicker(cat.key) });
     if (cat.key === 'wheels') b.drawIcon = (t, r) => drawRoundIconWheel(car.wheels, r, t);
     if (cat.key === 'color') b.drawIcon = (t, r) => {
       const cs = [0, 2, 3, 4, 6];
@@ -1273,6 +1640,77 @@ const Garage = {
     };
     if (cat.key === 'hat') b.drawIcon = (t, r) => { ctx.save(); ctx.translate(0, r * 0.38); ctx.scale(0.75, 0.75); if (car.hat) drawHat(car.hat, t); else emoji('🎩', 0, -r * 0.5, r); ctx.restore(); };
     return b;
+  },
+  openPicker(key) {
+    this.picker = { key, t: 0 }; this.idle = 0; Snd.pop();
+  },
+  pickerLayout() {
+    const n = CAT[this.picker.key].names.length;
+    const cols = Math.ceil(Math.sqrt(n * 1.7)), rows = Math.ceil(n / cols);
+    const cw = 940 / cols, ch = Math.min(540 / rows, cw * 0.95);
+    const gy0 = 400 - (rows * ch) / 2 + 10;
+    const cells = [];
+    for (let i = 0; i < n; i++) {
+      const r = Math.floor(i / cols), c = i % cols, inRow = Math.min(cols, n - r * cols);
+      const x0 = 640 - (inRow * cw) / 2;
+      cells.push({ i, x: x0 + c * cw + 6, y: gy0 + r * ch + 6, w: cw - 12, h: ch - 12 });
+    }
+    return { cells, top: gy0 - 30, bot: gy0 + rows * ch + 20 };
+  },
+  drawPicker(t) {
+    const pk = this.picker, key = pk.key, cat = CAT[key];
+    const k = easeOut(clamp(pk.t / 0.18, 0, 1));
+    ctx.fillStyle = `rgba(30,20,50,${0.45 * k})`; ctx.fillRect(0, 0, W, H);
+    const L = this.pickerLayout();
+    ctx.save(); ctx.translate(640, 400); ctx.scale(0.85 + 0.15 * k, 0.85 + 0.15 * k); ctx.translate(-640, -400);
+    ctx.lineWidth = 8; ctx.strokeStyle = cat.bg;
+    ctx.beginPath(); rr(150, L.top - 20, 980, L.bot - L.top + 40, 34); ctx.fillStyle = '#fffaf0'; ctx.fill(); ctx.stroke();
+    // kategori simgesi + kapat
+    ctx.lineWidth = 6; ctx.strokeStyle = '#fff'; circ(190, L.top - 20, 44, cat.bg, true);
+    if (key === 'wheels') drawWheel(car.wheels, 190, L.top - 20, 26, t * 2); else emoji(cat.icon, 190, L.top - 20, 46);
+    this.pickClose.y = L.top - 20; this.pickClose.draw(t);
+    for (const c of L.cells) {
+      const sel = car[key] === c.i;
+      ctx.save();
+      ctx.beginPath(); rr(c.x, c.y, c.w, c.h, 22); ctx.fillStyle = sel ? '#fff3bf' : '#ffffff'; ctx.fill();
+      ctx.lineWidth = sel ? 7 : 4; ctx.strokeStyle = sel ? '#ffb000' : '#e2d6c4'; ctx.stroke();
+      ctx.clip();
+      const cx = c.x + c.w / 2, cy = c.y + c.h / 2, m = Math.min(c.w, c.h);
+      if (key === 'color') { ctx.lineWidth = 5; ctx.strokeStyle = OUT; circ(cx, cy, m * 0.32, COLORS[c.i][0], true); ell(cx - m * 0.1, cy - m * 0.12, m * 0.08, m * 0.05, -0.6, 'rgba(255,255,255,0.6)'); }
+      else if (cat.icons) emoji(cat.icons[c.i], cx, cy, m * 0.5);
+      else if (key === 'wheels') drawWheel(c.i, cx, cy, m * 0.3, t * 1.5);
+      else {
+        const tmp = Object.assign({}, car, { [key]: c.i, mud: [], honkT: 0, squash: 0, hatLift: 0, hatV: 0 });
+        if (key === 'hat' && c.i === 0) { emoji('🚫', cx, cy, m * 0.45); }
+        else if (key === 'face' || key === 'hat') {
+          const B = BODIES[tmp.body], lift = (WHEEL_R[tmp.wheels] - 30) * 1.6;
+          const mo = B.mouth || B.eye;
+          const ax = key === 'face' ? (B.eye.x + mo.x) / 2 : B.hat.x, ay = (key === 'face' ? (B.eye.y + mo.y) / 2 : B.hat.y - 34) - lift;
+          const sc = m / (key === 'face' ? 165 : 150);
+          drawCar(tmp, cx - ax * sc, cy - ay * sc, sc, { t });
+        } else {
+          const sc = Math.min(c.w / 360, c.h / 340);
+          drawCar(tmp, cx, c.y + c.h - 14, sc, { t });
+        }
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  },
+  pickerClick(p) {
+    if (this.pickClose.hit(p)) { this.picker = null; Snd.click(); return; }
+    const L = this.pickerLayout();
+    for (const c of L.cells) {
+      if (p.x > c.x && p.x < c.x + c.w && p.y > c.y && p.y < c.y + c.h) {
+        const key = this.picker.key;
+        this.picker = null;
+        car[key] = c.i;
+        this.afterChange(key);
+        if (key !== 'horn') say(CAT[key].names[c.i]);
+        return;
+      }
+    }
+    if (p.x < 150 || p.x > 1130 || p.y < L.top - 20 || p.y > L.bot + 20) { this.picker = null; Snd.click(); }
   },
   partPos(key) {
     const s = 1.2, x = 640, y = 560 - this.z;
@@ -1321,6 +1759,7 @@ const Garage = {
     car.wheelA += dt * 1.5;
     emitTrail(car, 640, 560 - this.z, 1.2, dt * 0.5, -160);
     this.goBtn.pulse = this.changes >= 3 || this.t > 10;
+    if (this.picker) { this.picker.t += dt; this.idle = 0; }
     if (this.idle > 12) { this.idle = 0; say(pick(['Bir düğmeye bas!', 'Hadi yarışalım!', 'Bayrağa bas!'])); }
   },
   draw() {
@@ -1366,8 +1805,11 @@ const Garage = {
     drawP();
     drawCar(car, 640, 560 - this.z, 1.2, { t });
     for (const b of this.btns) b.draw(t);
+    if (!this.picker && (this.changes >= 3 || this.t > 9)) emoji('👈', 880 + Math.abs(Math.sin(t * 5)) * 18, 652, 54);
+    if (this.picker) this.drawPicker(t);
   },
   click(p) {
+    if (this.picker) { this.pickerClick(p); return; }
     for (const b of this.btns) if (b.hit(p)) { b.press = 1; b.onClick(); return; }
     // arabaya tıkla = korna
     if (p.x > 420 && p.x < 860 && p.y > 160 && p.y < 600) { honk(car, 640, 560 - this.z, 1.2); if (this.z <= 0) this.vz = 380; this.idle = 0; }
@@ -1375,9 +1817,10 @@ const Garage = {
   key(e) {
     const k = e.key;
     if (e.repeat) return;
+    if (this.picker) { this.picker = null; Snd.click(); return; }
     if (k === 'Enter') { this.goBtn.press = 1; this.start(); return; }
     if (k === ' ') { honk(car, 640, 560 - this.z, 1.2); if (this.z <= 0) this.vz = 380; this.idle = 0; return; }
-    if (k >= '1' && k <= '8') { const b = this.btns[+k - 1]; b.press = 1; b.onClick(); return; }
+    if (k >= '1' && k <= '8') { const b = this.btns[+k - 1]; b.press = 1; this.change(CATS[[0, 1, 2, 3, 4, 5, 6, 7][+k - 1]].key, +1); return; }
     if (k.length === 1 || k.startsWith('Arrow')) {
       // rastgele tuşa basmak = rastgele bir şey değişir
       const cat = pick(CATS);
@@ -1386,7 +1829,7 @@ const Garage = {
       if (cat.key !== 'horn') say(cat.names[car[cat.key]]);
     }
   },
-  buttons() { return this.btns; },
+  buttons() { return this.picker ? [this.pickClose] : this.btns; },
 };
 
 // ---------------- Yarış
@@ -1454,13 +1897,26 @@ const Drive = {
       boostT: 0, stars: 0, finished: false, finT: 0, onRamp: null, starPulse: 0, startT: 2.6, beeps: 0, pirtT: 3, shake: 0 });
     this.objs = buildCourse();
     car.mud = []; car.hatLift = 0; car.hatV = 0;
-    this.home = new Button({ x: 1220, y: 690, r: 24, bg: '#868e96', icon: '🏠' });
+    this.home = new Button({ x: 1098, y: 44, r: 28, bg: '#868e96', icon: '🏠' });
+    this.homeArm = 0;
+    const arrow = dir => (t, r) => { ctx.beginPath(); ctx.moveTo(-r * 0.42, dir * r * 0.2); ctx.lineTo(0, -dir * r * 0.32); ctx.lineTo(r * 0.42, dir * r * 0.2); ctx.closePath();
+      ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.lineJoin = 'round'; ctx.stroke(); };
+    this.upBtn = new Button({ x: 1196, y: 518, r: 52, bg: 'rgba(77,171,247,0.85)', drawIcon: arrow(1) });
+    this.dnBtn = new Button({ x: 1196, y: 640, r: 52, bg: 'rgba(77,171,247,0.85)', drawIcon: arrow(-1) });
+    this.hornBtn = new Button({ x: 82, y: 640, r: 52, bg: 'rgba(255,169,77,0.9)', icon: '📯' });
+    const ths = Object.keys(THEMES).filter(k => k !== this.theme);
+    this.theme = this.races ? pick(ths) : 'gunduz';
+    this.races = (this.races || 0) + 1;
     Music.play('drive');
   },
   carS() { return laneScale(this.ly); },
   carY() { return this.ly - this.z; },
   update(dt) {
     this.t += dt;
+    this.homeArm = Math.max(0, this.homeArm - dt);
+    this.home.icon = this.homeArm > 0 ? '❓' : '🏠'; this.home.bg = this.homeArm > 0 ? '#ff6b6b' : '#868e96'; this.home.pulse = this.homeArm > 0;
+    const hintOn = this.t < 14 && touchUsed;
+    this.upBtn.pulse = this.dnBtn.pulse = this.hornBtn.pulse = hintOn;
     updateCarAnim(car, dt);
     this.starPulse = Math.max(0, this.starPulse - dt * 3);
     this.shake = Math.max(0, this.shake - dt * 3);
@@ -1468,7 +1924,7 @@ const Drive = {
     if (this.startT > 0) {
       this.startT -= dt;
       const b = this.startT > 1.8 ? 0 : this.startT > 1.0 ? 1 : this.startT > 0.2 ? 2 : 3;
-      if (b > this.beeps) { this.beeps = b; Snd.beep(b === 3); if (b === 3) say('Başla!', true); }
+      if (b > this.beeps) { this.beeps = b; Snd.beep(b === 3); if (b === 3) say(this.theme === 'gunduz' ? 'Başla!' : THEMES[this.theme].say, true); }
       if (this.beeps === 0 && this.startT < 2.5) { this.beeps = 0.5; Snd.beep(false); }
       emitTrail(car, CARX, this.carY(), s, dt * 0.4, -120);
       return;
@@ -1665,13 +2121,20 @@ const Drive = {
     else if (k === ' ' || k === 'Enter' || k.length === 1) { if (!e.repeat) this.doHonk(); }
   },
   click(p) {
-    if (this.home.hit(p)) { Snd.pop(); go(Garage); return; }
+    if (this.home.hit(p)) {
+      this.home.press = 1;
+      if (this.homeArm > 0) { Snd.pop(); go(Garage); } else { this.homeArm = 2.5; Snd.click(); }
+      return;
+    }
     if (this.finished) return;
+    if (this.upBtn.hit(p)) { this.upBtn.press = 1; this.laneUp(); return; }
+    if (this.dnBtn.hit(p)) { this.dnBtn.press = 1; this.laneDown(); return; }
+    if (this.hornBtn.hit(p)) { this.hornBtn.press = 1; this.doHonk(); return; }
     const cy = this.carY(), s = this.carS();
     if (Math.abs(p.x - CARX) < 150 * s * 1.2 && p.y > cy - 200 * s && p.y < cy + 10) { this.doHonk(); return; }
     if (p.y < this.ly - 50) this.laneUp(); else if (p.y > this.ly + 25) this.laneDown(); else this.doHonk();
   },
-  buttons() { return [this.home]; },
+  buttons() { return [this.home, this.upBtn, this.dnBtn, this.hornBtn]; },
   drawObj(o, sx, t) {
     const gy = LANES[o.lane] + (o.dy || 0), ls = laneScale(LANES[o.lane]);
     ctx.save(); ctx.translate(sx, gy); ctx.scale(ls, ls);
@@ -1825,7 +2288,7 @@ const Drive = {
     const t = this.t;
     ctx.save();
     if (this.shake) ctx.translate(rand(-1, 1) * this.shake * 6, rand(-1, 1) * this.shake * 6);
-    drawWorld(this.dist, t);
+    drawWorld(this.dist, t, this.theme);
     const vis = [];
     for (const o of this.objs) {
       const sx = o.x - this.dist;
@@ -1872,18 +2335,20 @@ const Drive = {
     ctx.save(); const mc = { ...car, hatLift: 0, honkT: 0, squash: 0, mud: car.mud };
     drawCar(mc, bx + bw * p, by + 18, 0.2, { t }); ctx.restore();
     // ipuçları
-    if (this.startT <= 0 && this.t < 14 && !this.finished) {
+    if (this.startT <= 0 && this.t < 14 && !this.finished && !touchUsed) {
       const a = clamp((14 - this.t) / 2, 0, 1);
       ctx.globalAlpha = a;
-      const kc = (x, y, s) => { ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.beginPath(); rr(x - 26, y - 24, 52, 48, 10); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke(); text(s, x, y + 2, 30, OUT); };
-      ctx.save(); ctx.translate(475, 0);
-      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); rr(14, 84, 330, 76, 18); ctx.fill();
-      kc(50, 122, '▲'); kc(108, 122, '▼');
-      ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.beginPath(); rr(156, 98, 110, 48, 10); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(176, 112); ctx.lineTo(176, 130); ctx.lineTo(246, 130); ctx.lineTo(246, 112); ctx.lineWidth = 4; ctx.stroke(); emoji('📯', 300, 122, 40);
+      const kc = (x, y, s) => { ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.beginPath(); rr(x - 24, y - 22, 48, 44, 10); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke(); text(s, x, y + 2, 26, OUT); };
+      ctx.save(); ctx.translate(372, 0);
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); rr(0, 84, 536, 76, 18); ctx.fill();
+      kc(36, 122, '▲'); kc(90, 122, '▼');
+      kc(160, 122, '◀'); kc(214, 122, '▶'); emoji('🚀', 266, 122, 36);
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.beginPath(); rr(318, 100, 140, 44, 10); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(340, 112); ctx.lineTo(340, 130); ctx.lineTo(436, 130); ctx.lineTo(436, 112); ctx.stroke(); emoji('📯', 496, 122, 40);
       ctx.restore();
       ctx.globalAlpha = 1;
     }
+    if (!this.finished) { this.upBtn.draw(t); this.dnBtn.draw(t); this.hornBtn.draw(t); }
     // trafik ışığı
     if (this.startT > 0) {
       ctx.save(); ctx.translate(640, 250);
@@ -1927,7 +2392,7 @@ const End = {
   },
   draw() {
     const t = this.t;
-    drawWorld(COURSE_LEN - CARX, t);
+    drawWorld(COURSE_LEN - CARX, t, Drive.theme);
     ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, 0, W, H);
     // kupa
     ctx.save(); ctx.translate(470, 160 + Math.sin(t * 3) * 6); ctx.rotate(Math.sin(t * 2) * 0.06);
@@ -1967,18 +2432,45 @@ muteBtn.drawIcon = (t, r) => emoji(Snd.muted ? '🔇' : '🔊', 0, 0, r * 1.0);
 const fsBtn = new Button({ x: 1160, y: 44, r: 28, bg: '#495057' });
 fsBtn.drawIcon = (t, r) => { ctx.lineWidth = 5; ctx.strokeStyle = '#fff'; ctx.lineCap = 'round';
   for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { ctx.beginPath(); ctx.moveTo(sx * 12, sy * 4); ctx.lineTo(sx * 12, sy * 12); ctx.lineTo(sx * 4, sy * 12); ctx.stroke(); } };
+const de = document.documentElement;
+const fsSupported = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+if (!fsSupported) fsBtn.visible = false;
 function toggleFS() {
   try {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
-    else document.exitFullscreen && document.exitFullscreen();
+    const cur = document.fullscreenElement || document.webkitFullscreenElement;
+    if (!cur) { const f = de.requestFullscreen || de.webkitRequestFullscreen; if (f) { const r = f.call(de); if (r && r.catch) r.catch(() => {}); } }
+    else { const f = document.exitFullscreen || document.webkitExitFullscreen; if (f) f.call(document); }
   } catch (e) { /* yok say */ }
 }
+let touchUsed = false;
+// iPad/iPhone: sesi ilk dokunuşta aç
+function unlockAudio() {
+  Snd.init();
+  const ac = Snd.ac; if (!ac) return;
+  if (ac.state !== 'running') ac.resume();
+  if (!Snd.unlocked) {
+    try { const b = ac.createBuffer(1, 1, 22050), src = ac.createBufferSource(); src.buffer = b; src.connect(ac.destination); src.start(0); } catch (e) { /* */ }
+    Snd.unlocked = true;
+  }
+}
+addEventListener('touchend', unlockAudio, { passive: true });
+addEventListener('pointerup', unlockAudio);
+addEventListener('click', unlockAudio);
+document.addEventListener('visibilitychange', () => {
+  if (!Snd.ac) return;
+  if (document.hidden) Snd.ac.suspend(); else Snd.ac.resume();
+});
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+if (window.visualViewport) visualViewport.addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 300));
 
 // ============================================================ girdi
 const keys = {};
 function toLogical(e) { return { x: (e.clientX - OX) / SC, y: (e.clientY - OY) / SC }; }
 addEventListener('keydown', e => {
-  Snd.init();
+  unlockAudio();
   if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace', "'", '/'].includes(e.key)) e.preventDefault();
   keys[e.key] = true;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1989,7 +2481,8 @@ addEventListener('keyup', e => { keys[e.key] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 cv.addEventListener('pointerdown', e => {
   e.preventDefault();
-  Snd.init(); cv.focus();
+  unlockAudio(); cv.focus();
+  if (e.pointerType === 'touch' || e.pointerType === 'pen') touchUsed = true;
   const p = toLogical(e);
   if (muteBtn.hit(p)) { muteBtn.press = 1; Snd.setMuted(!Snd.muted); if (!Snd.muted) Snd.pop(); return; }
   if (fsBtn.hit(p)) { fsBtn.press = 1; toggleFS(); return; }
@@ -2020,6 +2513,14 @@ function frame(now) {
     scene.draw();
     muteBtn.draw(scene.t || 0); fsBtn.draw(scene.t || 0);
     ctx.restore();
+    // dikey tutulursa: "yan çevir" ipucu
+    if (innerHeight > innerWidth * 1.05) {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      const by = OY + H * SC, cy = by + (innerHeight - by) / 2, sz = Math.min(innerWidth * 0.12, (innerHeight - by) * 0.35);
+      ctx.save(); ctx.translate(innerWidth / 2, cy); ctx.rotate(Math.sin(now / 400) * 0.8 - 0.8);
+      emoji('📱', 0, 0, sz); ctx.restore();
+      emoji('🔄', innerWidth / 2 + sz, cy - sz * 0.5, sz * 0.6);
+    }
   } catch (err) {
     console.error(err);
   }
@@ -2029,4 +2530,4 @@ go(Title);
 requestAnimationFrame(frame);
 
 // test / hata ayıklama için
-window.__game = { get scene() { return scene; }, Title, Garage, Drive, End, car, go, P: () => P };
+window.__game = { get scene() { return scene; }, Title, Garage, Drive, End, car, go, P: () => P, drawCar, newCar };
