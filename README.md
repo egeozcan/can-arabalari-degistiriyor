@@ -12,11 +12,13 @@ ya da `index.html` dosyasını tarayıcıda açın. Kurulum yok, internet gerekm
 **1. Garaj — Arabanı değiştir!** Büyük bir düğmeye dokun, tüm seçenekler resimli olarak açılır, birini seç:
 - 🎨 16 renk · 🐞 10 desen (benekli, alevli, zebra, dama, inek desenli…)
 - 🚙 12 araç: araba, kamyon, otobüs, yarış, dondurma, ördek, pasta, itfaiye, traktör, küvet, roket, ayakkabı!
-- 10 tekerlek: kocaman, donut, kare, çiçek, karpuz, pizza, kurabiye, portakal, top…
+- 10 tekerlek: kocaman, donut, kare, çiçek, karpuz, pizza, kurabiye, portakal, top… ve **✏️ kendi tekerleğin!**
 - 😜 12 yüz · 🎩 16 şapka (korsan, cadı, saksı çiçek, lastik ördek, tek boynuz, palyaço peruğu…)
 - 🌈 12 egzoz (gökkuşağı, baloncuk, pırt bulutu, notalar, ateş, kar…) · 📯 13 korna (möö, pırt, miyav, hav hav, tren, aslan…)
 
 🎲 her şeyi rastgele değiştirir. Klavyede bir harfe basmak da rastgele bir şey değiştirir, 1–8 tuşları sıradakine geçer. 🏁 (veya Enter) yarışa başlatır.
+
+**✏️ Tekerlek atölyesi:** tekerlekler listesindeki son seçenek (**Kendi tekerleğim**) atölyeyi açar. Orada tekerleğin üstüne parmakla/fareyle boya yapılır, 12 renk, 3 fırça kalınlığı, silgi, 🗑️ temizle ve 8 çıkartma (⭐❤️🌸🌈⚡🐞👑🍭) var. ✅ ile bitince tasarım garaja döner ve arabada o tekerlek kullanılır; tasarım tarayıcıda saklanır, oyunu kapatıp açsan bile durur.
 
 **2. Yol — Yarış!** Araba kendi gider.
 - ⬆️ ⬇️ şerit değiştir (ekrandaki mavi oklar, ya da arabanın üstüne/altına dokun)

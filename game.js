@@ -477,7 +477,7 @@ const CATS = [
   { key: 'color', icon: '🎨', bg: '#ff6b6b', names: COLORS.map(c => c[1]) },
   { key: 'pattern', icon: '🐞', bg: '#ffa94d', names: ['Düz', 'Benekli', 'Çizgili', 'Alevli', 'Kalpli', 'Yıldızlı', 'Zebra', 'Damalı', 'Şimşekli', 'İnek desenli'] },
   { key: 'body', icon: '🚙', bg: '#ffd43b', names: ['Araba', 'Kamyon', 'Otobüs', 'Yarış arabası', 'Dondurma arabası', 'Ördek araba', 'Pasta araba', 'İtfaiye', 'Traktör', 'Küvet araba', 'Roket araba', 'Ayakkabı araba'] },
-  { key: 'wheels', icon: '', bg: '#69db7c', names: ['Normal tekerlek', 'Kocaman tekerlek', 'Donut tekerlek', 'Kare tekerlek', 'Çiçek tekerlek', 'Karpuz tekerlek', 'Pizza tekerlek', 'Kurabiye tekerlek', 'Portakal tekerlek', 'Top tekerlek'] },
+  { key: 'wheels', icon: '', bg: '#69db7c', names: ['Normal tekerlek', 'Kocaman tekerlek', 'Donut tekerlek', 'Kare tekerlek', 'Çiçek tekerlek', 'Karpuz tekerlek', 'Pizza tekerlek', 'Kurabiye tekerlek', 'Portakal tekerlek', 'Top tekerlek', 'Kendi tekerleğim'] },
   { key: 'face', icon: '😜', bg: '#4dabf7', names: ['Mutlu', 'Güneş gözlüğü', 'Yıldız gözler', 'Kalp gözler', 'Uykucu', 'Dil çıkaran', 'Tek göz', 'Şaşkın', 'Kızgın', 'Robot', 'Bıyıklı', 'Kahkaha'] },
   { key: 'hat', icon: '🎩', bg: '#9775fa', names: ['Şapkasız', 'Taç', 'Parti şapkası', 'Kovboy şapkası', 'Aşçı şapkası', 'Pervane', 'Tavşan kulakları', 'Viking', 'Korsan şapkası', 'Cadı şapkası', 'Baret', 'Saksı çiçek', 'Lastik ördek', 'Noel Baba şapkası', 'Tek boynuz', 'Palyaço peruğu'] },
   { key: 'trail', icon: '🌈', bg: '#f783ac', names: ['Duman', 'Gökkuşağı', 'Baloncuk', 'Kalpler', 'Yıldızlar', 'Pırt bulutu', 'Notalar', 'Konfeti', 'Ateş', 'Kar taneleri', 'Su damlaları', 'Çiçekler'],
@@ -791,7 +791,34 @@ const BODIES = [
   },
 ];
 
-const WHEEL_R = [30, 50, 33, 30, 34, 34, 34, 32, 33, 34];
+const WHEEL_R = [30, 50, 33, 30, 34, 34, 34, 32, 33, 34, 34];
+
+/* ---- 10: çocuğun kendi tekerleği
+ * Boyama katmanı ayrı bir kanvasta tutulur (saydam zemin).
+ * Çizim uzayı: tekerlek yarıçapı = ART_RES piksel, merkez (ART_RES, ART_RES).
+ */
+const ART_RES = 256;
+const artCv = document.createElement('canvas');
+artCv.width = artCv.height = ART_RES * 2;
+const artCtx = artCv.getContext('2d');
+let artMarks = 0;
+function artClear() { artCtx.setTransform(1, 0, 0, 1, 0, 0); artCtx.clearRect(0, 0, artCv.width, artCv.height); }
+function artSave() {
+  try {
+    if (artMarks > 0) localStorage.setItem('cade-wheel-art', artCv.toDataURL('image/png'));
+    else localStorage.removeItem('cade-wheel-art');
+  } catch (e) { /* yer yok / kapalı: yok say */ }
+}
+function artLoad() {
+  try {
+    const s = localStorage.getItem('cade-wheel-art');
+    if (!s) return;
+    const im = new Image();
+    im.onload = () => { artCtx.setTransform(1, 0, 0, 1, 0, 0); artCtx.drawImage(im, 0, 0, artCv.width, artCv.height); artMarks = 1; };
+    im.src = s;
+  } catch (e) { /* yok say */ }
+}
+artLoad();
 
 function drawWheel(type, x, y, r, a) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(a);
@@ -885,6 +912,23 @@ function drawWheel(type, x, y, r, a) {
       const bc = ['#ff4747', '#fff', '#3d8bff', '#ffd23f', '#fff', '#4cc95a'];
       for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, r, i * TAU / 6, (i + 1) * TAU / 6); ctx.closePath(); ctx.fillStyle = bc[i]; ctx.fill(); }
       ctx.lineWidth = 4; circ(0, 0, r, null, true); circ(0, 0, r * 0.18, '#fff', true);
+      break;
+    }
+    case 10: { // kendi tasarımın
+      circ(0, 0, r, '#33323d', true);
+      circ(0, 0, r * 0.63, '#dfe4ea', true);
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      for (let i = 0; i < 5; i++) {
+        const an = i * TAU / 5;
+        ctx.beginPath(); ctx.moveTo(Math.cos(an) * r * 0.2, Math.sin(an) * r * 0.2);
+        ctx.lineTo(Math.cos(an) * r * 0.61, Math.sin(an) * r * 0.61); ctx.stroke();
+      }
+      circ(0, 0, r * 0.2, '#ff5a5a', true);
+      ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r * 0.995, 0, TAU); ctx.clip();
+      ctx.drawImage(artCv, -r, -r, r * 2, r * 2);
+      ctx.restore();
+      ctx.lineWidth = 5; ctx.strokeStyle = OUT;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
       break;
     }
   }
@@ -1678,7 +1722,10 @@ const Garage = {
       const cx = c.x + c.w / 2, cy = c.y + c.h / 2, m = Math.min(c.w, c.h);
       if (key === 'color') { ctx.lineWidth = 5; ctx.strokeStyle = OUT; circ(cx, cy, m * 0.32, COLORS[c.i][0], true); ell(cx - m * 0.1, cy - m * 0.12, m * 0.08, m * 0.05, -0.6, 'rgba(255,255,255,0.6)'); }
       else if (cat.icons) emoji(cat.icons[c.i], cx, cy, m * 0.5);
-      else if (key === 'wheels') drawWheel(c.i, cx, cy, m * 0.3, t * 1.5);
+      else if (key === 'wheels') {
+        drawWheel(c.i, cx, cy, m * 0.3, t * 1.5);
+        if (c.i === 10) emoji('✏️', c.x + c.w - 26, c.y + 26, 36);
+      }
       else {
         const tmp = Object.assign({}, car, { [key]: c.i, mud: [], honkT: 0, squash: 0, hatLift: 0, hatV: 0 });
         if (key === 'hat' && c.i === 0) { emoji('🚫', cx, cy, m * 0.45); }
@@ -1707,6 +1754,8 @@ const Garage = {
         car[key] = c.i;
         this.afterChange(key);
         if (key !== 'horn') say(CAT[key].names[c.i]);
+        // kendi tekerleğini seçtiyse atölyeyi aç
+        if (key === 'wheels' && c.i === 10) go(WheelStudio);
         return;
       }
     }
@@ -1830,6 +1879,168 @@ const Garage = {
     }
   },
   buttons() { return this.picker ? [this.pickClose] : this.btns; },
+};
+
+// ---------------- Tekerlek atölyesi (kendi tekerleğini süsle)
+const WCOLORS = ['#ff4747', '#ff9f1c', '#ffd23f', '#4cc95a', '#3d8bff', '#9b5de5', '#ff6fb5', '#25c4c4', '#ffffff', '#4b4b6e', '#8b5a2b', '#ffe066'];
+const WSTAMPS = ['⭐', '❤️', '🌸', '🌈', '⚡', '🐞', '👑', '🍭'];
+const WS_CX = 396, WS_CY = 396, WS_R = 228;
+const WS_BTN_ON = '#ffd43b', WS_BTN_OFF = '#d0ebff';
+
+const WheelStudio = {
+  enter() {
+    this.t = 0;
+    this.color = this.color || WCOLORS[0];
+    this.brushW = this.brushW || 28;
+    this.kind = this.kind || 'brush';
+    this.stamp = this.stamp || 0;
+    this.drawing = false; this.last = null;
+    car.wheels = 10;
+    this.btns = [];
+    const add = b => { this.btns.push(b); return b; };
+
+    // renkler
+    WCOLORS.forEach((c, i) => add(new Button({
+      x: 755 + (i % 6) * 86, y: 200 + Math.floor(i / 6) * 72, r: 30, bg: WS_BTN_OFF,
+      sel: () => this.kind === 'brush' && this.color === c,
+      onClick: () => { this.color = c; this.kind = 'brush'; Snd.click(); },
+      drawIcon: () => { ctx.lineWidth = 4; ctx.strokeStyle = OUT; circ(0, 0, 23, c, true); },
+    })));
+
+    // çıkartmalar
+    WSTAMPS.forEach((em, i) => add(new Button({
+      x: 728 + i * 68, y: 376, r: 30, bg: WS_BTN_OFF,
+      sel: () => this.kind === 'stamp' && this.stamp === i,
+      onClick: () => { this.stamp = i; this.kind = 'stamp'; Snd.pop(); },
+      drawIcon: () => emoji(em, 0, 0, 42),
+    })));
+
+    // fırça kalınlıkları
+    [12, 28, 52].forEach((w, i) => add(new Button({
+      x: 764 + i * 80, y: 478, r: 34, bg: WS_BTN_OFF,
+      sel: () => this.kind === 'brush' && this.brushW === w,
+      onClick: () => { this.brushW = w; this.kind = 'brush'; Snd.click(); },
+      drawIcon: () => { ctx.lineWidth = 3; ctx.strokeStyle = OUT; circ(0, 0, w * 0.42, this.color, true); },
+    })));
+
+    add(new Button({ x: 1030, y: 478, r: 34, bg: WS_BTN_OFF, icon: '🧽', sel: () => this.kind === 'erase',
+      onClick: () => { this.kind = 'erase'; Snd.click(); } }));
+    add(new Button({ x: 1120, y: 478, r: 34, bg: WS_BTN_OFF, icon: '🗑️',
+      onClick: () => { artClear(); artMarks = 0; artSave(); Snd.poof(); } }));
+
+    add(new Button({ x: 762, y: 594, r: 46, bg: '#868e96', icon: '↩️', onClick: () => this.finish() }));
+    add(new Button({ x: 1128, y: 594, r: 56, bg: '#40c057', icon: '✅', onClick: () => this.finish() }));
+
+    Music.play('garage');
+    say('Tekerleğini süsle!', true);
+  },
+
+  // ekran noktası -> çizim kanvası noktası
+  artP(p) { const k = ART_RES / WS_R; return { x: (p.x - WS_CX) * k + ART_RES, y: (p.y - WS_CY) * k + ART_RES }; },
+  clampP(p) {
+    const dx = p.x - WS_CX, dy = p.y - WS_CY, d = Math.hypot(dx, dy), m = WS_R * 0.97;
+    return d <= m ? p : { x: WS_CX + dx / d * m, y: WS_CY + dy / d * m };
+  },
+  paint(a, b) {
+    const pa = this.artP(a), pb = this.artP(b);
+    const erase = this.kind === 'erase';
+    const w = erase ? 68 : this.brushW;
+    artCtx.setTransform(1, 0, 0, 1, 0, 0);
+    artCtx.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
+    artCtx.lineCap = 'round'; artCtx.lineJoin = 'round';
+    artCtx.lineWidth = w; artCtx.strokeStyle = erase ? '#000' : this.color;
+    artCtx.beginPath(); artCtx.moveTo(pa.x, pa.y); artCtx.lineTo(pb.x, pb.y); artCtx.stroke();
+    artCtx.beginPath(); artCtx.arc(pb.x, pb.y, w / 2, 0, TAU);
+    artCtx.fillStyle = erase ? '#000' : this.color; artCtx.fill();
+    artCtx.globalCompositeOperation = 'source-over';
+    artMarks++;
+  },
+  stampAt(p) {
+    const a = this.artP(p);
+    artCtx.setTransform(1, 0, 0, 1, 0, 0);
+    artCtx.font = `96px ${EMOJI}`;
+    artCtx.textAlign = 'center'; artCtx.textBaseline = 'middle';
+    artCtx.fillStyle = '#000';
+    artCtx.fillText(WSTAMPS[this.stamp], a.x, a.y + 6);
+    artMarks++;
+    sparkle(p.x, p.y, 0.75, 7);
+  },
+
+  update(dt) {
+    this.t += dt;
+    for (const b of this.btns) if (b.sel) b.bg = b.sel() ? WS_BTN_ON : WS_BTN_OFF;
+  },
+
+  draw() {
+    const t = this.t;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#cdeaff'); g.addColorStop(1, '#a5d8ff');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 14; i++) {
+      const x = (i * 137 + t * 14) % (W + 240) - 120, y = 60 + (i % 5) * 142;
+      circ(x, y, 26 + (i % 3) * 24, 'rgba(255,255,255,0.4)');
+    }
+    // başlık
+    text('TEKERLEK ATÖLYESİ', 640, 58, 50, '#ff5a8a', { stroke: '#fff', lw: 14 });
+    text('TEKERLEK ATÖLYESİ', 640, 58, 50, '#ff5a8a', { stroke: OUT, lw: 5 });
+    // panel
+    ctx.lineWidth = 8; ctx.strokeStyle = '#4dabf7';
+    ctx.beginPath(); rr(690, 108, 560, 556, 34); ctx.fillStyle = '#fffaf0'; ctx.fill(); ctx.stroke();
+    text('RENKLER', 970, 152, 28, '#4dabf7');
+    text('ÇIKARTMALAR', 970, 332, 28, '#4dabf7');
+    text('FIRÇA', 844, 434, 26, '#4dabf7');
+    ['ince', 'orta', 'kalın', 'silgi', 'temizle'].forEach((s, i) => text(s, [764, 844, 924, 1030, 1120][i], 522, 19, '#8aa0b8'));
+    // tekerlek
+    ell(WS_CX, WS_CY + WS_R + 20, WS_R * 0.8, 20, 0, 'rgba(30,60,110,0.16)');
+    ctx.save(); ctx.translate(WS_CX, WS_CY);
+    ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.setLineDash([26, 22]);
+    ctx.beginPath(); ctx.arc(0, 0, WS_R + 22, t * 0.4, t * 0.4 + TAU); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+    drawWheel(10, WS_CX, WS_CY, WS_R, 0);
+    drawP();
+    text('Boya ve süsle!', WS_CX, 690, 30, '#fff', { stroke: '#3d8bff', lw: 10 });
+    for (const b of this.btns) b.draw(t);
+    // seçili olanın köşesine tik koy
+    for (const b of this.btns) {
+      if (!b.sel || !b.sel()) continue;
+      ctx.save(); ctx.translate(b.x + 18, b.y + 18);
+      ctx.lineWidth = 3; ctx.strokeStyle = '#fff';
+      circ(0, 0, 11, '#40c057', true);
+      text('✓', 0, 0, 19, '#fff');
+      ctx.restore();
+    }
+  },
+
+  click(p) {
+    for (const b of this.btns) if (b.hit(p)) { b.press = 1; b.onClick(); return; }
+    if (Math.hypot(p.x - WS_CX, p.y - WS_CY) > WS_R * 0.99) return;
+    const q = this.clampP(p);
+    if (this.kind === 'stamp') { this.stampAt(q); Snd.pop(); return; }
+    this.drawing = true; this.last = q;
+    this.paint(q, q);
+  },
+  move(p) {
+    if (!this.drawing) return;
+    const q = this.clampP(p);
+    this.paint(this.last, q);
+    this.last = q;
+  },
+  up() {
+    if (!this.drawing) return;
+    this.drawing = false; this.last = null;
+    artSave();
+  },
+
+  finish() {
+    artSave(); Snd.whoosh();
+    go(Garage);
+    poof(WS_CX, WS_CY, 1.3);
+    say('Tekerleğin hazır!', true);
+  },
+  key(e) {
+    if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Enter') this.finish();
+  },
+  buttons() { return this.btns; },
 };
 
 // ---------------- Yarış
@@ -2494,7 +2705,10 @@ cv.addEventListener('pointermove', e => {
   let any = false;
   for (const b of bs) { b.hover = b.hit(p); any = any || b.hover; }
   cv.style.cursor = any ? 'pointer' : 'default';
+  if (scene && scene.move) scene.move(p);
 });
+addEventListener('pointerup', () => { if (scene && scene.up) scene.up(); });
+addEventListener('pointercancel', () => { if (scene && scene.up) scene.up(); });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 
 // ============================================================ döngü
@@ -2530,4 +2744,4 @@ go(Title);
 requestAnimationFrame(frame);
 
 // test / hata ayıklama için
-window.__game = { get scene() { return scene; }, Title, Garage, Drive, End, car, go, P: () => P, drawCar, newCar };
+window.__game = { get scene() { return scene; }, Title, Garage, WheelStudio, Drive, End, car, go, P: () => P, drawCar, newCar, artCv, artClear };
