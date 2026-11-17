@@ -18,7 +18,12 @@ ya da `index.html` dosyasını tarayıcıda açın. Kurulum yok, internet gerekm
 
 🎲 her şeyi rastgele değiştirir. Klavyede bir harfe basmak da rastgele bir şey değiştirir, 1–8 tuşları sıradakine geçer. 🏁 (veya Enter) yarışa başlatır.
 
-**✏️ Tekerlek atölyesi:** tekerlekler listesindeki son seçenek (**Kendi tekerleğim**) atölyeyi açar. Orada tekerleğin üstüne parmakla/fareyle boya yapılır, 12 renk, 3 fırça kalınlığı, silgi, 🗑️ temizle ve 8 çıkartma (⭐❤️🌸🌈⚡🐞👑🍭) var. ✅ ile bitince tasarım garaja döner ve arabada o tekerlek kullanılır; tasarım tarayıcıda saklanır, oyunu kapatıp açsan bile durur.
+**✏️ Tekerlek atölyesi:** tekerlekler listesindeki son seçenek (**Kendi tekerleğim**) atölyeyi açar. İki sekmesi var:
+
+- **🔷 Şekil:** tekerlek yuvarlak olmak zorunda değil! 12 hazır şekil (daire, oval, yumurta, çubuk, üçgen, kare, yıldız, dişli, çiçek, testere, zikzak, taş) ya da 🎲 rastgele. Köşeleri parmakla/fareyle çekip iterek istediğin şekli yap, ➖/➕ ile köşe sayısını (3–16) değiştir, 🔺/🔵 ile kenarları keskin ya da yumuşak yap. Şeklin kenarları yolda gerçekten hissedilir: tekerlek döndükçe araba iner, kalkar, öne arkaya sallanır, her inişte "tak!" sesi, toz ve sarsıntı olur. Ölçer ne kadar tümsekli olduğunu gösterir; köşede yolu deneyen küçük bir araba var.
+- **🎨 Boya:** tekerleğin üstüne parmakla/fareyle boya yapılır, 12 renk, 3 fırça kalınlığı, silgi, 🗑️ temizle ve 8 çıkartma (⭐❤️🌸🌈⚡🐞👑🍭) var.
+
+✅ ile bitince tasarım garaja döner ve arabada o tekerlek kullanılır; şekil ve boya tarayıcıda saklanır, oyunu kapatıp açsan bile durur.
 
 **2. Yol — Yarış!** Araba kendi gider.
 - ⬆️ ⬇️ şerit değiştir (ekrandaki mavi oklar, ya da arabanın üstüne/altına dokun)

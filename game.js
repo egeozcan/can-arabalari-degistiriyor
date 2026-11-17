@@ -820,7 +820,112 @@ function artLoad() {
 }
 artLoad();
 
-function drawWheel(type, x, y, r, a) {
+/* ---- 10: çocuğun kendi tekerleği — ŞEKİL
+ * Şekil, eşit açılı köşelerin merkeze uzaklıklarıdır (0.3 … 1). Köşeler
+ * "keskin" (düz kenarlar) ya da "yumuşak" (eğri) bağlanır. Şekilden tekerleğin
+ * yerdeki yüksekliği (destek fonksiyonu) hesaplanır: tekerlek yuvarlandıkça
+ * araba şeklin kenarlarına göre inip kalkar, öne arkaya sallanır.
+ */
+const CW_MIN = 0.3, CW_PHASE = 1.1;
+const cwAng = (i, n) => -Math.PI / 2 + i * TAU / n;
+function shapeOutline(sh) {
+  const n = sh.r.length, out = [];
+  if (!sh.smooth) {
+    for (let i = 0; i < n; i++) out.push([Math.cos(cwAng(i, n)) * sh.r[i], Math.sin(cwAng(i, n)) * sh.r[i]]);
+    return out;
+  }
+  const S = Math.ceil(120 / n);
+  for (let i = 0; i < n; i++) {
+    const p0 = sh.r[(i + n - 1) % n], p1 = sh.r[i], p2 = sh.r[(i + 1) % n], p3 = sh.r[(i + 2) % n];
+    for (let s = 0; s < S; s++) {
+      const t = s / S;
+      const r = 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
+      const a = cwAng(i, n) + t * TAU / n, rr2 = clamp(r, CW_MIN * 0.8, 1.05);
+      out.push([Math.cos(a) * rr2, Math.sin(a) * rr2]);
+    }
+  }
+  return out;
+}
+const CW_PRESETS = [
+  { name: 'Daire', make: () => ({ smooth: true, r: Array(12).fill(1) }) },
+  { name: 'Oval', make: () => ({ smooth: true, r: Array.from({ length: 12 }, (_, i) => { const a = cwAng(i, 12); return 1 / Math.sqrt(Math.cos(a) ** 2 + Math.sin(a) ** 2 / 0.36); }) }) },
+  { name: 'Yumurta', make: () => ({ smooth: true, r: Array.from({ length: 12 }, (_, i) => { const a = cwAng(i, 12); return clamp((1 / Math.sqrt(Math.cos(a) ** 2 + Math.sin(a) ** 2 / 0.56)) * (1 + 0.13 * Math.cos(a)) / 1.13, CW_MIN, 1); }) }) },
+  { name: 'Çubuk', make: () => ({ smooth: true, r: Array.from({ length: 12 }, (_, i) => { const a = cwAng(i, 12); return clamp(1 / Math.sqrt(Math.cos(a) ** 2 + Math.sin(a) ** 2 / 0.1), CW_MIN, 1); }) }) },
+  { name: 'Üçgen', make: () => ({ smooth: false, r: [1, 1, 1] }) },
+  { name: 'Kare', make: () => ({ smooth: false, r: [0.71, 1, 0.71, 1, 0.71, 1, 0.71, 1] }) },
+  { name: 'Yıldız', make: () => ({ smooth: false, r: [1, 0.45, 1, 0.45, 1, 0.45, 1, 0.45, 1, 0.45] }) },
+  { name: 'Dişli', make: () => ({ smooth: false, r: [1, 1, 0.72, 0.72, 1, 1, 0.72, 0.72, 1, 1, 0.72, 0.72, 1, 1, 0.72, 0.72] }) },
+  { name: 'Çiçek', make: () => ({ smooth: true, r: [1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5, 1, 0.5] }) },
+  { name: 'Testere', make: () => ({ smooth: false, r: [1, 0.83, 0.67, 0.5, 1, 0.83, 0.67, 0.5, 1, 0.83, 0.67, 0.5] }) },
+  { name: 'Zikzak', make: () => ({ smooth: false, r: [1, 0.55, 1, 0.55, 1, 0.55, 1, 0.55, 1, 0.55, 1, 0.55, 1, 0.55, 1, 0.55] }) },
+  { name: 'Taş', make: () => ({ smooth: false, r: [0.9, 0.6, 1, 0.55, 0.85, 0.5, 1, 0.65, 0.8] }) },
+];
+function cwRandomShape() {
+  const n = randi(5, 12);
+  return { smooth: Math.random() < 0.25, r: Array.from({ length: n }, () => Math.round(rand(0.38, 1) * 20) / 20) };
+}
+function cwResample(r, m) {
+  const n = r.length;
+  return Array.from({ length: m }, (_, j) => { const f = j * n / m, i = Math.floor(f), t = f - i; return r[i % n] * (1 - t) + r[(i + 1) % n] * t; });
+}
+const CW = { sh: CW_PRESETS[0].make(), pts: [], H: new Float32Array(360), maxR: 1, minR: 1, h0: 1, R: 34, bump: 0 };
+function cwBuild() {
+  const sh = CW.sh, pts = CW.pts = shapeOutline(sh);
+  let mx = 0, mn = 9;
+  for (const [x, y] of pts) { const d = Math.hypot(x, y); mx = Math.max(mx, d); mn = Math.min(mn, d); }
+  CW.maxR = mx; CW.minR = mn;
+  let sum = 0, hi = -9, lo = 9;
+  for (let k = 0; k < 360; k++) {
+    const a = k * TAU / 360, s = Math.sin(a), c = Math.cos(a);
+    let h = -9;
+    for (const p of pts) { const v = p[0] * s + p[1] * c; if (v > h) h = v; }
+    CW.H[k] = h; sum += h; hi = Math.max(hi, h); lo = Math.min(lo, h);
+  }
+  CW.h0 = sum / 360;
+  CW.R = clamp(34 / CW.h0, 20, 62);
+  CW.bump = (hi - lo) * CW.R;
+}
+// tekerleğin a açısındaki yerden yüksekliği (şekil birimiyle)
+function cwH(a) {
+  const f = (((a % TAU) + TAU) % TAU) / TAU * 360, i = Math.floor(f), t = f - i;
+  return CW.H[i % 360] * (1 - t) + CW.H[(i + 1) % 360] * t;
+}
+function cwSave() { try { localStorage.setItem('cade-wheel-shape', JSON.stringify(CW.sh)); } catch (e) { /* yok say */ } }
+(function cwLoad() {
+  try {
+    const s = JSON.parse(localStorage.getItem('cade-wheel-shape') || 'null');
+    if (s && Array.isArray(s.r) && s.r.length >= 3 && s.r.length <= 16 && s.r.every(v => typeof v === 'number'))
+      CW.sh = { smooth: !!s.smooth, r: s.r.map(v => clamp(v, CW_MIN, 1)) };
+  } catch (e) { /* yok say */ }
+  cwBuild();
+})();
+function cwPath(sc, k = 1) {
+  ctx.beginPath();
+  CW.pts.forEach((p, i) => { if (i) ctx.lineTo(p[0] * sc * k, p[1] * sc * k); else ctx.moveTo(p[0] * sc * k, p[1] * sc * k); });
+  ctx.closePath();
+}
+// rm: şekil biriminin (1.0) piksel karşılığı
+function drawCustomWheel(rm) {
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 5; ctx.strokeStyle = OUT;
+  cwPath(rm); ctx.fillStyle = '#33323d'; ctx.fill(); ctx.stroke();
+  cwPath(rm, 0.63); ctx.fillStyle = '#dfe4ea'; ctx.fill(); ctx.lineWidth = 4; ctx.stroke();
+  const np = CW.pts.length;
+  for (let i = 0; i < 5; i++) {
+    const p = CW.pts[Math.floor(i * np / 5)], d = Math.hypot(p[0], p[1]) || 1;
+    ctx.beginPath(); ctx.moveTo(p[0] / d * rm * 0.1, p[1] / d * rm * 0.1);
+    ctx.lineTo(p[0] * rm * 0.61, p[1] * rm * 0.61); ctx.stroke();
+  }
+  circ(0, 0, rm * Math.min(0.2, CW.minR * 0.28), '#ff5a5a', true);
+  ctx.save(); cwPath(rm, 0.995); ctx.clip();
+  ctx.drawImage(artCv, -rm, -rm, rm * 2, rm * 2);
+  ctx.restore();
+  ctx.lineWidth = 5; ctx.strokeStyle = OUT;
+  cwPath(rm); ctx.stroke();
+}
+
+// fit: r = en uzak köşe (simge); değilse r = tekerleğin ortalama yüksekliği
+function drawWheel(type, x, y, r, a, fit) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(a);
   ctx.lineWidth = 5; ctx.strokeStyle = OUT;
   switch (type) {
@@ -914,23 +1019,7 @@ function drawWheel(type, x, y, r, a) {
       ctx.lineWidth = 4; circ(0, 0, r, null, true); circ(0, 0, r * 0.18, '#fff', true);
       break;
     }
-    case 10: { // kendi tasarımın
-      circ(0, 0, r, '#33323d', true);
-      circ(0, 0, r * 0.63, '#dfe4ea', true);
-      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
-      for (let i = 0; i < 5; i++) {
-        const an = i * TAU / 5;
-        ctx.beginPath(); ctx.moveTo(Math.cos(an) * r * 0.2, Math.sin(an) * r * 0.2);
-        ctx.lineTo(Math.cos(an) * r * 0.61, Math.sin(an) * r * 0.61); ctx.stroke();
-      }
-      circ(0, 0, r * 0.2, '#ff5a5a', true);
-      ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r * 0.995, 0, TAU); ctx.clip();
-      ctx.drawImage(artCv, -r, -r, r * 2, r * 2);
-      ctx.restore();
-      ctx.lineWidth = 5; ctx.strokeStyle = OUT;
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
-      break;
-    }
+    case 10: drawCustomWheel(fit ? r / CW.maxR : r * CW.R / 34); break;
   }
   ctx.restore();
 }
@@ -1255,6 +1344,14 @@ function wheelXs(c) {
   const ws = BODIES[c.body].wheels;
   return c.wheels === 1 && ws.length > 2 ? [ws[0], ws[ws.length - 1]] : ws;
 }
+// kendi tekerleğinde yolun tümseklerinden gelen iniş-çıkış ve sallanma
+function customRide(c) {
+  const B = BODIES[c.body], ws = wheelXs(c), n = ws.length;
+  const wsc = B.wscale && n === B.wheels.length ? B.wscale : null;
+  const dyAt = i => { const k = wsc ? wsc[i] : 1; return CW.R * k * cwH(c.wheelA / k + i * CW_PHASE) - 34 * k; };
+  const rear = dyAt(0), front = dyAt(n - 1);
+  return { dy: (rear + front) / 2, pitch: -Math.atan2(front - rear, ws[n - 1] - ws[0]), xm: (ws[0] + ws[n - 1]) / 2 };
+}
 /* Arabayı çiz. (x,y) yer teması, s ölçek. */
 function drawCar(c, x, y, s, o = {}) {
   const t = o.t || 0;
@@ -1263,14 +1360,16 @@ function drawCar(c, x, y, s, o = {}) {
   BODY_COL = col;
   const wr = WHEEL_R[c.wheels];
   const lift = (wr - 30) * 1.6;
-  let sqb = 0;
+  let sqb = 0, pitch = 0, pivX = 0;
   if (c.wheels === 3) { const a = c.wheelA % (Math.PI / 2); sqb = wr * (Math.abs(Math.cos(a)) + Math.abs(Math.sin(a)) - 1); }
+  else if (c.wheels === 10) { const rd = customRide(c); sqb = rd.dy; pitch = rd.pitch; pivX = rd.xm; }
   ctx.save();
   ctx.translate(x, y); ctx.scale(s, s);
   const sq = c.squash || 0;
   ctx.scale(1 + sq * 0.22, 1 - sq * 0.22);
   if (o.rot) { ctx.translate(0, -90); ctx.rotate(o.rot); ctx.translate(0, 90); }
   ctx.translate(0, -lift - sqb + (o.bob || 0));
+  if (pitch) { ctx.translate(pivX, lift - wr); ctx.rotate(pitch); ctx.translate(-pivX, wr - lift); }
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
 
   // canavar tekerlek amortisörleri
@@ -1297,7 +1396,7 @@ function drawCar(c, x, y, s, o = {}) {
   }
   // tekerlekler
   const ws = wheelXs(c), wsc = B.wscale && ws.length === B.wheels.length ? B.wscale : null;
-  ws.forEach((wx, i) => { const k = wsc ? wsc[i] : 1; drawWheel(c.wheels, wx, -wr * k + lift, wr * k, c.wheelA / k); });
+  ws.forEach((wx, i) => { const k = wsc ? wsc[i] : 1; drawWheel(c.wheels, wx, -wr * k + lift, wr * k, c.wheelA / k + (c.wheels === 10 ? i * CW_PHASE : 0)); });
   ctx.restore();
 }
 
@@ -1378,7 +1477,7 @@ class Button {
   }
 }
 function drawRoundIconWheel(type, r, t) {
-  drawWheel(type, 0, 0, r * 0.62 / (type === 1 ? 1.15 : 1), t * 2);
+  drawWheel(type, 0, 0, r * 0.62 / (type === 1 ? 1.15 : 1), t * 2, true);
 }
 
 // ============================================================ arka planlar
@@ -1711,7 +1810,7 @@ const Garage = {
     ctx.beginPath(); rr(150, L.top - 20, 980, L.bot - L.top + 40, 34); ctx.fillStyle = '#fffaf0'; ctx.fill(); ctx.stroke();
     // kategori simgesi + kapat
     ctx.lineWidth = 6; ctx.strokeStyle = '#fff'; circ(190, L.top - 20, 44, cat.bg, true);
-    if (key === 'wheels') drawWheel(car.wheels, 190, L.top - 20, 26, t * 2); else emoji(cat.icon, 190, L.top - 20, 46);
+    if (key === 'wheels') drawWheel(car.wheels, 190, L.top - 20, 26, t * 2, true); else emoji(cat.icon, 190, L.top - 20, 46);
     this.pickClose.y = L.top - 20; this.pickClose.draw(t);
     for (const c of L.cells) {
       const sel = car[key] === c.i;
@@ -1723,7 +1822,7 @@ const Garage = {
       if (key === 'color') { ctx.lineWidth = 5; ctx.strokeStyle = OUT; circ(cx, cy, m * 0.32, COLORS[c.i][0], true); ell(cx - m * 0.1, cy - m * 0.12, m * 0.08, m * 0.05, -0.6, 'rgba(255,255,255,0.6)'); }
       else if (cat.icons) emoji(cat.icons[c.i], cx, cy, m * 0.5);
       else if (key === 'wheels') {
-        drawWheel(c.i, cx, cy, m * 0.3, t * 1.5);
+        drawWheel(c.i, cx, cy, m * 0.3, t * 1.5, true);
         if (c.i === 10) emoji('✏️', c.x + c.w - 26, c.y + 26, 36);
       }
       else {
@@ -1881,11 +1980,12 @@ const Garage = {
   buttons() { return this.picker ? [this.pickClose] : this.btns; },
 };
 
-// ---------------- Tekerlek atölyesi (kendi tekerleğini süsle)
+// ---------------- Tekerlek atölyesi (kendi tekerleğinin şeklini ve boyasını yap)
 const WCOLORS = ['#ff4747', '#ff9f1c', '#ffd23f', '#4cc95a', '#3d8bff', '#9b5de5', '#ff6fb5', '#25c4c4', '#ffffff', '#4b4b6e', '#8b5a2b', '#ffe066'];
 const WSTAMPS = ['⭐', '❤️', '🌸', '🌈', '⚡', '🐞', '👑', '🍭'];
 const WS_CX = 396, WS_CY = 396, WS_R = 228;
 const WS_BTN_ON = '#ffd43b', WS_BTN_OFF = '#d0ebff';
+const BUMP_TXT = ['Düz yol', 'Hafif sallanıyor', 'Tümsekli!', 'Çok tümsekli!!', 'ÇILGIN TÜMSEK!!!'];
 
 const WheelStudio = {
   enter() {
@@ -1894,18 +1994,54 @@ const WheelStudio = {
     this.brushW = this.brushW || 28;
     this.kind = this.kind || 'brush';
     this.stamp = this.stamp || 0;
-    this.drawing = false; this.last = null;
+    this.mode = this.mode || 'shape';
+    this.drawing = false; this.last = null; this.drag = -1;
     car.wheels = 10;
     this.btns = [];
-    const add = b => { this.btns.push(b); return b; };
+    const add = (b, mode) => { b.mode = mode; this.btns.push(b); return b; };
+    const reshape = () => { cwBuild(); cwSave(); };
 
-    // renkler
+    // sekmeler
+    [['shape', '🔷', 250], ['paint', '🎨', 390]].forEach(([m, ic, y]) => add(new Button({
+      x: 78, y, r: 46, bg: WS_BTN_OFF, icon: ic, sel: () => this.mode === m,
+      onClick: () => { this.mode = m; this.drag = -1; this.drawing = false; Snd.pop(); },
+    })));
+
+    // ---- şekil
+    CW_PRESETS.forEach((pr, i) => add(new Button({
+      x: 755 + (i % 6) * 86, y: 214 + Math.floor(i / 6) * 84, r: 32, bg: WS_BTN_OFF,
+      onClick: () => { CW.sh = pr.make(); reshape(); Snd.pop(); sparkle(WS_CX, WS_CY, 0.8, 8); },
+      drawIcon: (t, r) => {
+        const o = shapeOutline(pr.make()), k = r * 0.8;
+        ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = OUT;
+        ctx.beginPath(); o.forEach((p, j) => j ? ctx.lineTo(p[0] * k, p[1] * k) : ctx.moveTo(p[0] * k, p[1] * k)); ctx.closePath();
+        ctx.fillStyle = '#33323d'; ctx.fill(); ctx.stroke();
+        ctx.beginPath(); o.forEach((p, j) => j ? ctx.lineTo(p[0] * k * 0.5, p[1] * k * 0.5) : ctx.moveTo(p[0] * k * 0.5, p[1] * k * 0.5)); ctx.closePath();
+        ctx.fillStyle = '#dfe4ea'; ctx.fill();
+      },
+    }), 'shape'));
+    const setCount = d => {
+      const n = clamp(CW.sh.r.length + d, 3, 16);
+      if (n === CW.sh.r.length) return;
+      CW.sh = { smooth: CW.sh.smooth, r: cwResample(CW.sh.r, n) }; reshape(); Snd.click();
+    };
+    add(new Button({ x: 780, y: 410, r: 32, bg: WS_BTN_OFF, onClick: () => setCount(-1),
+      drawIcon: () => { ctx.fillStyle = OUT; ctx.fillRect(-14, -4, 28, 8); } }), 'shape');
+    add(new Button({ x: 920, y: 410, r: 32, bg: WS_BTN_OFF, onClick: () => setCount(1),
+      drawIcon: () => { ctx.fillStyle = OUT; ctx.fillRect(-14, -4, 28, 8); ctx.fillRect(-4, -14, 8, 28); } }), 'shape');
+    add(new Button({ x: 1030, y: 410, r: 32, bg: WS_BTN_OFF,
+      onClick: () => { CW.sh = { smooth: !CW.sh.smooth, r: CW.sh.r }; reshape(); Snd.click(); },
+      drawIcon: () => emoji(CW.sh.smooth ? '🔵' : '🔺', 0, 0, 38) }), 'shape');
+    add(new Button({ x: 1130, y: 410, r: 32, bg: WS_BTN_OFF, icon: '🎲',
+      onClick: () => { CW.sh = cwRandomShape(); reshape(); Snd.boing(); sparkle(WS_CX, WS_CY, 0.8, 8); } }), 'shape');
+
+    // ---- boya: renkler
     WCOLORS.forEach((c, i) => add(new Button({
       x: 755 + (i % 6) * 86, y: 200 + Math.floor(i / 6) * 72, r: 30, bg: WS_BTN_OFF,
       sel: () => this.kind === 'brush' && this.color === c,
       onClick: () => { this.color = c; this.kind = 'brush'; Snd.click(); },
       drawIcon: () => { ctx.lineWidth = 4; ctx.strokeStyle = OUT; circ(0, 0, 23, c, true); },
-    })));
+    }), 'paint'));
 
     // çıkartmalar
     WSTAMPS.forEach((em, i) => add(new Button({
@@ -1913,7 +2049,7 @@ const WheelStudio = {
       sel: () => this.kind === 'stamp' && this.stamp === i,
       onClick: () => { this.stamp = i; this.kind = 'stamp'; Snd.pop(); },
       drawIcon: () => emoji(em, 0, 0, 42),
-    })));
+    }), 'paint'));
 
     // fırça kalınlıkları
     [12, 28, 52].forEach((w, i) => add(new Button({
@@ -1921,18 +2057,18 @@ const WheelStudio = {
       sel: () => this.kind === 'brush' && this.brushW === w,
       onClick: () => { this.brushW = w; this.kind = 'brush'; Snd.click(); },
       drawIcon: () => { ctx.lineWidth = 3; ctx.strokeStyle = OUT; circ(0, 0, w * 0.42, this.color, true); },
-    })));
+    }), 'paint'));
 
     add(new Button({ x: 1030, y: 478, r: 34, bg: WS_BTN_OFF, icon: '🧽', sel: () => this.kind === 'erase',
-      onClick: () => { this.kind = 'erase'; Snd.click(); } }));
+      onClick: () => { this.kind = 'erase'; Snd.click(); } }), 'paint');
     add(new Button({ x: 1120, y: 478, r: 34, bg: WS_BTN_OFF, icon: '🗑️',
-      onClick: () => { artClear(); artMarks = 0; artSave(); Snd.poof(); } }));
+      onClick: () => { artClear(); artMarks = 0; artSave(); Snd.poof(); } }), 'paint');
 
     add(new Button({ x: 762, y: 594, r: 46, bg: '#868e96', icon: '↩️', onClick: () => this.finish() }));
     add(new Button({ x: 1128, y: 594, r: 56, bg: '#40c057', icon: '✅', onClick: () => this.finish() }));
 
     Music.play('garage');
-    say('Tekerleğini süsle!', true);
+    say('Tekerleğini yap!', true);
   },
 
   // ekran noktası -> çizim kanvası noktası
@@ -1965,14 +2101,32 @@ const WheelStudio = {
     artMarks++;
     sparkle(p.x, p.y, 0.75, 7);
   },
+  // şekil köşesi (ekran noktası)
+  handleP(i) {
+    const n = CW.sh.r.length, a = cwAng(i, n), r = CW.sh.r[i] * WS_R;
+    return { x: WS_CX + Math.cos(a) * r, y: WS_CY + Math.sin(a) * r };
+  },
+  nearestHandle(p) {
+    let best = -1, bd = 1e9;
+    for (let i = 0; i < CW.sh.r.length; i++) { const h = this.handleP(i), d = Math.hypot(h.x - p.x, h.y - p.y); if (d < bd) { bd = d; best = i; } }
+    return best;
+  },
+  pull(p) {
+    const r = clamp(Math.hypot(p.x - WS_CX, p.y - WS_CY) / WS_R, CW_MIN, 1);
+    CW.sh.r[this.drag] = Math.round(r * 50) / 50;
+    cwBuild();
+  },
 
   update(dt) {
     this.t += dt;
-    for (const b of this.btns) if (b.sel) b.bg = b.sel() ? WS_BTN_ON : WS_BTN_OFF;
+    for (const b of this.btns) {
+      if (b.mode) b.visible = b.mode === this.mode;
+      if (b.sel) b.bg = b.sel() ? WS_BTN_ON : WS_BTN_OFF;
+    }
   },
 
   draw() {
-    const t = this.t;
+    const t = this.t, shape = this.mode === 'shape';
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#cdeaff'); g.addColorStop(1, '#a5d8ff');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -1983,26 +2137,30 @@ const WheelStudio = {
     // başlık
     text('TEKERLEK ATÖLYESİ', 640, 58, 50, '#ff5a8a', { stroke: '#fff', lw: 14 });
     text('TEKERLEK ATÖLYESİ', 640, 58, 50, '#ff5a8a', { stroke: OUT, lw: 5 });
+    text('ŞEKİL', 78, 312, 24, '#4dabf7'); text('BOYA', 78, 452, 24, '#4dabf7');
     // panel
     ctx.lineWidth = 8; ctx.strokeStyle = '#4dabf7';
     ctx.beginPath(); rr(690, 108, 560, 556, 34); ctx.fillStyle = '#fffaf0'; ctx.fill(); ctx.stroke();
-    text('RENKLER', 970, 152, 28, '#4dabf7');
-    text('ÇIKARTMALAR', 970, 332, 28, '#4dabf7');
-    text('FIRÇA', 844, 434, 26, '#4dabf7');
-    ['ince', 'orta', 'kalın', 'silgi', 'temizle'].forEach((s, i) => text(s, [764, 844, 924, 1030, 1120][i], 522, 19, '#8aa0b8'));
+    if (shape) this.drawShapePanel(t); else {
+      text('RENKLER', 970, 152, 28, '#4dabf7');
+      text('ÇIKARTMALAR', 970, 332, 28, '#4dabf7');
+      text('FIRÇA', 844, 434, 26, '#4dabf7');
+      ['ince', 'orta', 'kalın', 'silgi', 'temizle'].forEach((s, i) => text(s, [764, 844, 924, 1030, 1120][i], 522, 19, '#8aa0b8'));
+    }
     // tekerlek
     ell(WS_CX, WS_CY + WS_R + 20, WS_R * 0.8, 20, 0, 'rgba(30,60,110,0.16)');
     ctx.save(); ctx.translate(WS_CX, WS_CY);
     ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.setLineDash([26, 22]);
     ctx.beginPath(); ctx.arc(0, 0, WS_R + 22, t * 0.4, t * 0.4 + TAU); ctx.stroke();
     ctx.setLineDash([]); ctx.restore();
-    drawWheel(10, WS_CX, WS_CY, WS_R, 0);
+    ctx.save(); ctx.translate(WS_CX, WS_CY); drawCustomWheel(WS_R); ctx.restore();
+    if (shape) this.drawHandles(t);
     drawP();
-    text('Boya ve süsle!', WS_CX, 690, 30, '#fff', { stroke: '#3d8bff', lw: 10 });
+    text(shape ? 'Köşeleri çek, it, tümsek yap!' : 'Boya ve süsle!', WS_CX, 690, 30, '#fff', { stroke: '#3d8bff', lw: 10 });
     for (const b of this.btns) b.draw(t);
     // seçili olanın köşesine tik koy
     for (const b of this.btns) {
-      if (!b.sel || !b.sel()) continue;
+      if (!b.visible || !b.sel || !b.sel()) continue;
       ctx.save(); ctx.translate(b.x + 18, b.y + 18);
       ctx.lineWidth = 3; ctx.strokeStyle = '#fff';
       circ(0, 0, 11, '#40c057', true);
@@ -2011,8 +2169,56 @@ const WheelStudio = {
     }
   },
 
+  drawHandles(t) {
+    ctx.save();
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(77,171,247,0.7)'; ctx.setLineDash([10, 10]);
+    ctx.beginPath(); ctx.arc(WS_CX, WS_CY, WS_R, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(WS_CX, WS_CY, WS_R * CW_MIN, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+    for (let i = 0; i < CW.sh.r.length; i++) {
+      const h = this.handleP(i), on = i === this.drag, pul = 1 + Math.sin(t * 5 + i) * 0.06;
+      ctx.lineWidth = 5; ctx.strokeStyle = OUT;
+      circ(h.x, h.y, (on ? 26 : 20) * pul, on ? '#ffd43b' : '#fff', true);
+      circ(h.x, h.y, 6, on ? OUT : '#ff5a8a');
+    }
+  },
+
+  drawShapePanel(t) {
+    text('ŞEKİLLER', 970, 160, 28, '#4dabf7');
+    text('KÖŞE', 850, 362, 26, '#4dabf7');
+    text(String(CW.sh.r.length), 850, 410, 44, OUT);
+    text('kenar', 1030, 460, 19, '#8aa0b8');
+    text('rastgele', 1130, 460, 19, '#8aa0b8');
+    // tümsek ölçeri
+    const lv = CW.bump < 1.5 ? 0 : CW.bump < 5 ? 1 : CW.bump < 10 ? 2 : CW.bump < 17 ? 3 : 4;
+    this.lv = lv;
+    for (let i = 0; i < 5; i++) {
+      const on = i <= lv && (lv > 0 || i === 0);
+      const x = 785 + i * 40, y = 496;
+      ctx.lineWidth = 3; ctx.strokeStyle = OUT;
+      circ(x, y, 9 + i * 2, on ? ['#69db7c', '#c0eb75', '#ffd43b', '#ff922b', '#ff5a5a'][i] : '#e9ecef', true);
+    }
+    text(BUMP_TXT[lv], 1085, 496, 24, ['#2f9e44', '#5c940d', '#e67700', '#d9480f', '#e03131'][lv]);
+    // yol denemesi
+    ctx.save();
+    ctx.beginPath(); rr(826, 520, 240, 130, 18); ctx.clip();
+    const gy = 640;
+    ctx.fillStyle = '#d8f3ff'; ctx.fillRect(826, 520, 240, 130);
+    ctx.fillStyle = '#74c69d'; ctx.fillRect(826, gy, 240, 16);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.setLineDash([22, 18]); ctx.lineDashOffset = (t * 160) % 40;
+    ctx.beginPath(); ctx.moveTo(826, gy + 8); ctx.lineTo(1066, gy + 8); ctx.stroke(); ctx.setLineDash([]);
+    const tmp = Object.assign({}, car, { wheels: 10, mud: [], honkT: 0, squash: 0, hatLift: 0, hatV: 0, wheelA: t * 6 });
+    drawCar(tmp, 946, gy, 0.36, { t });
+    ctx.restore();
+  },
+
   click(p) {
     for (const b of this.btns) if (b.hit(p)) { b.press = 1; b.onClick(); return; }
+    if (this.mode === 'shape') {
+      if (Math.hypot(p.x - WS_CX, p.y - WS_CY) > WS_R * 1.15) return;
+      this.drag = this.nearestHandle(p); this.pull(p); Snd.click();
+      return;
+    }
     if (Math.hypot(p.x - WS_CX, p.y - WS_CY) > WS_R * 0.99) return;
     const q = this.clampP(p);
     if (this.kind === 'stamp') { this.stampAt(q); Snd.pop(); return; }
@@ -2020,19 +2226,21 @@ const WheelStudio = {
     this.paint(q, q);
   },
   move(p) {
+    if (this.drag >= 0) { this.pull(p); return; }
     if (!this.drawing) return;
     const q = this.clampP(p);
     this.paint(this.last, q);
     this.last = q;
   },
   up() {
+    if (this.drag >= 0) { this.drag = -1; cwSave(); Snd.pop(); return; }
     if (!this.drawing) return;
     this.drawing = false; this.last = null;
     artSave();
   },
 
   finish() {
-    artSave(); Snd.whoosh();
+    artSave(); cwSave(); Snd.whoosh();
     go(Garage);
     poof(WS_CX, WS_CY, 1.3);
     say('Tekerleğin hazır!', true);
@@ -2162,6 +2370,7 @@ const Drive = {
     if (this.wobT > 0) { this.wobT -= dt; this.rot = Math.sin(this.wobT * 16) * 0.4 * Math.min(1, this.wobT); if (this.wobT <= 0) this.rot = 0; }
     const wr = WHEEL_R[car.wheels];
     car.wheelA += this.speed * dt / (wr * s);
+    if (car.wheels === 10) this.bumpyRide(dt, s);
     emitTrail(car, CARX, this.carY(), s, dt, -this.speed);
     if (this.boostT > 0) {
       const a = carAnchor(car, CARX, this.carY(), s, 'trail');
@@ -2174,6 +2383,26 @@ const Drive = {
       if (Math.random() < 0.5) confetti(2);
       if (this.finT > 3.2) go(End);
     }
+  },
+  // kendi tekerleğin tümsekliyse: her inişte tok bir "tak", toz ve sarsıntı
+  bumpyRide(dt, s) {
+    const y = customRide(car).dy;
+    this.bumpT = Math.max(0, (this.bumpT || 0) - dt);
+    if (this.bumpY === undefined) { this.bumpY = y; this.bumpTop = y; this.bumpFall = false; }
+    if (y < this.bumpY) {
+      if (!this.bumpFall) { this.bumpFall = true; this.bumpTop = this.bumpY; }
+    } else if (y > this.bumpY && this.bumpFall) {
+      this.bumpFall = false;
+      const drop = this.bumpTop - this.bumpY, k = clamp(drop / 20, 0, 1);
+      if (drop > 3 && this.z <= 0 && this.bumpT <= 0) {
+        this.bumpT = 0.11;
+        Snd.tone(rand(90, 130), 0.1, { type: 'sine', vol: 0.05 + k * 0.17, slide: 50 });
+        this.shake = Math.max(this.shake, k * 0.55);
+        car.squash = Math.max(car.squash, k * 0.3);
+        if (k > 0.3) addP({ x: CARX + rand(-70, 70), y: this.ly, vx: rand(-200, 0) - this.speed * 0.5, vy: rand(-90, -30), size: rand(5, 9) * s * 1.6, grow: 20, life: 0.4, col: 'rgba(230,220,200,0.85)' });
+      }
+    }
+    this.bumpY = y;
   },
   collide(dt) {
     const cx = this.dist + CARX, s = this.carS();
