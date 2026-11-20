@@ -120,7 +120,7 @@ const Snd = {
   setMuted(m) {
     this.muted = m;
     if (this.master) this.master.gain.value = m ? 0 : 0.8;
-    if (m && 'speechSynthesis' in window) speechSynthesis.cancel();
+    if (m) Voice.stop();
   },
   tone(f, dur, o = {}) {
     const ac = this.ac; if (!ac) return;
@@ -292,33 +292,52 @@ const Music = {
   },
 };
 
-// ---- konuşma (Türkçe ses varsa)
+// ---- konuşma: voice/ klasöründeki hazır sesler (tools/gen-voice.mjs ile fal.ai'de üretildi)
 const Voice = {
-  v: null, last: 0,
-  init() {
-    if (!('speechSynthesis' in window)) return;
-    const load = () => {
-      const vs = speechSynthesis.getVoices();
-      this.v = vs.find(v => /^tr/i.test(v.lang) && /female|kadın|yelda|seda|emel|filiz/i.test(v.name))
-        || vs.find(v => /^tr/i.test(v.lang)) || null;
-    };
-    load();
-    speechSynthesis.onvoiceschanged = load;
+  last: 0, tok: 0, cache: {}, src: null, el: null,
+  // tools/gen-voice.mjs içindeki slug ile birebir aynı olmalı
+  slug(t) {
+    return t.toLocaleLowerCase('tr')
+      .replace(/[çğıöşü]/g, c => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' })[c])
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  },
+  url(t) { return 'voice/' + this.slug(t) + '.mp3'; },
+  // Web Audio için çözülmüş ses; fetch olmazsa (file://) null döner
+  load(t) {
+    const k = this.slug(t);
+    if (!(k in this.cache)) {
+      this.cache[k] = fetch(this.url(t))
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then(b => new Promise((ok, no) => Snd.ac.decodeAudioData(b, ok, no)))
+        .catch(e => { if (location.protocol !== 'file:') console.warn('ses yok:', t, e); return null; });
+    }
+    return this.cache[k];
+  },
+  stop() {
+    if (this.src) { try { this.src.stop(); } catch (e) { /* */ } this.src = null; }
+    if (this.el) { this.el.pause(); this.el = null; }
   },
   say(t, force) {
-    if (!this.v || Snd.muted) return;
+    if (Snd.muted || !Snd.ac) return;
     const now = performance.now();
     if (!force && now - this.last < 900) return;
     this.last = now;
-    try {
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(t);
-      u.voice = this.v; u.lang = this.v.lang; u.rate = 1.05; u.pitch = 1.35; u.volume = 1;
-      speechSynthesis.speak(u);
-    } catch (e) { /* sessiz kal */ }
+    const tok = ++this.tok;
+    this.stop();
+    this.load(t).then(buf => {
+      if (tok !== this.tok || Snd.muted || performance.now() - now > 1500) return;
+      if (buf) {
+        const s = Snd.ac.createBufferSource();
+        s.buffer = buf; s.connect(Snd.master); s.start();
+        this.src = s;
+      } else if (location.protocol === 'file:') {
+        // dosyadan açınca fetch çalışmaz; düz <audio> ile çal
+        const a = new Audio(this.url(t)); a.play().catch(() => {}); this.el = a;
+      }
+    });
   },
 };
-Voice.init();
 const say = (t, f) => Voice.say(t, f);
 
 // ============================================================ parçacıklar

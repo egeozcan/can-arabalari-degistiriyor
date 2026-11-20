@@ -36,4 +36,11 @@ ya da `index.html` dosyasını tarayıcıda açın. Kurulum yok, internet gerekm
 
 **3. Bitiş** — Kupa, konfeti ve toplanan yıldızlar. 🔁 tekrar yarış, 🔧 garaja dön.
 
-Bilgisayarda Türkçe ses varsa oyun konuşur (Windows/Mac'te genelde vardır). 🔊 ile ses kapatılabilir.
+Oyun konuşur! Sesler `voice/` klasöründe hazır kayıtlı (fal.ai üzerinden ElevenLabs v4 ile üretildi), bilgisayarın ya da tabletin Türkçe sesi olması gerekmez. 🔊 ile ses kapatılabilir.
+
+### Yeni bir cümle eklenince
+`game.js`'te `say('...')` ile yeni bir cümle eklediysen ya da bir seçeneğin adını değiştirdiysen sesini üret:
+```
+node tools/gen-voice.mjs --missing      # eksik sesleri listeler
+FAL_KEY=... node tools/gen-voice.mjs    # eksikleri üretip voice/ içine yazar
+```
