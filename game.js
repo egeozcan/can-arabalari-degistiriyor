@@ -292,9 +292,10 @@ const Music = {
   },
 };
 
-// ---- konuşma: voice/ klasöründeki hazır sesler (tools/gen-voice.mjs ile fal.ai'de üretildi)
+// ---- konuşma: önce tarayıcının Türkçe sesi, gerekirse voice/ kayıtları
 const Voice = {
   last: 0, tok: 0, cache: {}, src: null, el: null,
+  synth: window.speechSynthesis, utterance: null, startTimer: null,
   // tools/gen-voice.mjs içindeki slug ile birebir aynı olmalı
   slug(t) {
     return t.toLocaleLowerCase('tr')
@@ -303,41 +304,83 @@ const Voice = {
       .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   },
   url(t) { return 'voice/' + this.slug(t) + '.mp3'; },
-  // Web Audio için çözülmüş ses; fetch olmazsa (file://) null döner
+  // Web Audio için çözülmüş ses
   load(t) {
     const k = this.slug(t);
     if (!(k in this.cache)) {
       this.cache[k] = fetch(this.url(t))
         .then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
         .then(b => new Promise((ok, no) => Snd.ac.decodeAudioData(b, ok, no)))
-        .catch(e => { if (location.protocol !== 'file:') console.warn('ses yok:', t, e); return null; });
+        .catch(e => { console.warn('ses yok:', t, e); return null; });
     }
     return this.cache[k];
   },
+  stopSpeech() {
+    if (!this.utterance) return;
+    clearTimeout(this.startTimer);
+    this.utterance = null;
+    this.synth.cancel();
+  },
   stop() {
+    this.tok++;
+    this.stopSpeech();
     if (this.src) { try { this.src.stop(); } catch (e) { /* */ } this.src = null; }
     if (this.el) { this.el.pause(); this.el = null; }
   },
   say(t, force) {
-    if (Snd.muted || !Snd.ac) return;
+    if (Snd.muted) return;
     const now = performance.now();
     if (!force && now - this.last < 900) return;
     this.last = now;
-    const tok = ++this.tok;
     this.stop();
+    const tok = this.tok;
+    if (!this.speak(t, tok)) this.playRecording(t, tok);
+  },
+  speak(t, tok) {
+    if (!this.synth || !window.SpeechSynthesisUtterance) return false;
+    const voices = this.synth.getVoices().filter(v => /^tr(?:-|_|$)/i.test(v.lang));
+    const voice = voices.find(v => /female|kadın|yelda|seda|emel|filiz/i.test(v.name)) || voices[0];
+    if (!voice) return false;
+
+    const u = new SpeechSynthesisUtterance(t);
+    u.voice = voice; u.lang = voice.lang; u.rate = 1.05; u.pitch = 1.35;
+    this.utterance = u;
+    const fallback = () => {
+      if (this.utterance !== u) return;
+      this.stopSpeech();
+      this.playRecording(t, tok);
+    };
+    u.onstart = () => { if (this.utterance === u) clearTimeout(this.startTimer); };
+    u.onend = () => {
+      if (this.utterance !== u) return;
+      clearTimeout(this.startTimer);
+      this.utterance = null;
+    };
+    u.onerror = fallback;
+    this.startTimer = setTimeout(fallback, 1500);
+    try { this.synth.speak(u); } catch (e) { fallback(); }
+    return true;
+  },
+  playRecording(t, tok) {
+    if (tok !== this.tok || Snd.muted) return;
+    if (!Snd.ac || location.protocol === 'file:') {
+      // Dosyadan açınca fetch çalışmayabilir.
+      const a = new Audio(this.url(t));
+      this.el = a;
+      a.play().catch(() => {});
+      return;
+    }
+    const now = performance.now();
     this.load(t).then(buf => {
-      if (tok !== this.tok || Snd.muted || performance.now() - now > 1500) return;
-      if (buf) {
-        const s = Snd.ac.createBufferSource();
-        s.buffer = buf; s.connect(Snd.master); s.start();
-        this.src = s;
-      } else if (location.protocol === 'file:') {
-        // dosyadan açınca fetch çalışmaz; düz <audio> ile çal
-        const a = new Audio(this.url(t)); a.play().catch(() => {}); this.el = a;
-      }
+      if (!buf || tok !== this.tok || Snd.muted || performance.now() - now > 1500) return;
+      const s = Snd.ac.createBufferSource();
+      s.buffer = buf; s.connect(Snd.master); s.start();
+      this.src = s;
     });
   },
 };
+// Ses listesi bazı tarayıcılarda ilk sorgudan sonra yüklenir.
+Voice.synth?.getVoices();
 const say = (t, f) => Voice.say(t, f);
 
 // ============================================================ parçacıklar
