@@ -258,6 +258,33 @@ const Snd = {
     [1046, 1318, 1568].forEach(f => this.tone(f, 0.9, { type: 'triangle', vol: 0.09, delay: 0.55, hold: true }));
     [523, 659, 784].forEach(f => this.tone(f, 0.9, { type: 'square', vol: 0.04, filter: 2000, delay: 0.55, hold: true }));
   },
+  // ---- parti sesleri
+  hop() { this.tone(420, 0.12, { type: 'sine', vol: 0.2, slide: 980 }); this.pop(); },
+  clap() {
+    this.noise(0.06, { freq: 2500, ftype: 'highpass', vol: 0.45 });
+    this.noise(0.05, { freq: 2500, ftype: 'highpass', vol: 0.35, delay: 0.03 });
+  },
+  skid() {
+    this.noise(0.5, { freq: 1800, slide: 600, ftype: 'bandpass', q: 3, vol: 0.35 });
+    this.tone(300, 0.5, { type: 'triangle', vol: 0.1, slide: 150 });
+  },
+  blow() { this.noise(0.7, { freq: 1200, slide: 300, vol: 0.4, attack: 0.15 }); },
+  // "İyi ki doğdun" melodisi; süreyi (sn) nota tablosundan hesaplayıp döndürür (ses kapalıyken de doğru)
+  birthday() {
+    const B = 0.24; // vuruş
+    const N = [[-5, 0.75], [-5, 0.25], [-3, 1], [-5, 1], [0, 1], [-1, 2],
+      [-5, 0.75], [-5, 0.25], [-3, 1], [-5, 1], [2, 1], [0, 2],
+      [-5, 0.75], [-5, 0.25], [7, 1], [4, 1], [0, 1], [-1, 1], [-3, 2],
+      [5, 0.75], [5, 0.25], [4, 1], [0, 1], [2, 1], [0, 3]];
+    let at = 0;
+    for (const [n, d] of N) {
+      this.tone(523.25 * 2 ** (n / 12), d * B * 0.95, { type: 'triangle', vol: 0.09, delay: at, hold: true });
+      at += d * B;
+    }
+    // bas: ilk "do"dan sonra her 3 vuruşta bir
+    [0, 7, 7, 0, 0, 5, 0, 7, 0].forEach((r, i) => this.tone(130.81 * 2 ** (r / 12), 3 * B * 0.9, { type: 'square', vol: 0.03, filter: 1200, delay: B + i * 3 * B }));
+    return at + 0.25;
+  },
 };
 
 const HORN_TXT = ['DÜT DÜT!', 'VAK VAK!', 'MÖÖÖ!', 'PIRT!', 'BOİİNG!', 'DİYU DİYU!', 'CİK CİK!', 'MİYAV!', 'HAV HAV!', 'TUUUT!', 'GRAAAV!', 'DİNG DONG!', 'DÜRÜDÜ!'];
@@ -270,6 +297,9 @@ const TRACKS = {
   drive: { bpm: 148, wave: 'square', vol: 0.025, roots: [0, 5, 7, 0],
     mel: [0, 4, 7, 12, 7, 4, 0, 4, 5, 9, 12, 9, 5, 9, 12, null,
       7, 11, 14, 11, 7, null, 2, null, 4, 7, 12, 7, 4, null, 0, null] },
+  party: { bpm: 128, wave: 'triangle', vol: 0.04, roots: [0, 7, 5, 7],
+    mel: [0, null, 4, 7, 12, null, 7, null, 11, null, 7, 4, 7, null, null, null,
+      9, null, 5, 9, 12, null, 9, null, 7, 11, 14, null, 12, null, null, null] },
 };
 const Music = {
   cur: null, step: 0, next: 0,
@@ -648,7 +678,7 @@ const BODIES = [
   },
   { // 4 dondurma
     wheels: [-86, 82], eye: { x: 100, y: -126, s: 0.75 }, mouth: { x: 120, y: -55, s: 0.85 },
-    hat: { x: -30, y: -306 }, trail: { x: -142, y: -45 },
+    hat: { x: -30, y: -306 }, trail: { x: -142, y: -45 }, ride: { x: 70, y: -166 },
     back() {
       // kocaman dondurma külahı
       ctx.lineWidth = 5; ctx.strokeStyle = OUT;
@@ -685,7 +715,7 @@ const BODIES = [
   },
   { // 5 ördek
     wheels: [-72, 66], eye: { x: 92, y: -160, s: 0.78 }, mouth: null,
-    hat: { x: 84, y: -192 }, trail: { x: -150, y: -80 },
+    hat: { x: 84, y: -192 }, trail: { x: -150, y: -80 }, ride: { x: -40, y: -108 },
     path() {
       // gövde (saat yönünün tersi), kafa da aynı yönde
       ctx.moveTo(-156, -124);
@@ -783,7 +813,7 @@ const BODIES = [
   },
   { // 9 küvet
     wheels: [-92, 92], eye: { x: 30, y: -90, s: 0.9 }, mouth: { x: 30, y: -52, s: 0.9 },
-    hat: { x: 30, y: -150 }, trail: { x: -146, y: -70 },
+    hat: { x: 30, y: -150 }, trail: { x: -146, y: -70 }, ride: { x: 10, y: -122 }, foam: true,
     back(c, t) {
       ctx.lineWidth = 5; ctx.strokeStyle = OUT;
       ctx.beginPath(); ctx.moveTo(-128, -128); ctx.lineTo(-128, -190); ctx.quadraticCurveTo(-128, -210, -104, -210); ctx.lineTo(-86, -210);
@@ -961,6 +991,19 @@ function cwSave() { try { localStorage.setItem('cade-wheel-shape', JSON.stringif
   } catch (e) { /* yok say */ }
   cwBuild();
 })();
+// kaç doğum günü partisi yapıldı: sıradaki doğum günü kimin, ona göre belli olur
+function partyLoad() {
+  try {
+    const s = JSON.parse(localStorage.getItem('cade-party') || 'null');
+    if (s && Number.isInteger(s.n) && s.n >= 0 && s.n < 1e6) return s.n;
+  } catch (e) { /* yok say */ }
+  return 0;
+}
+function partySave(n) {
+  partyN = n;
+  try { localStorage.setItem('cade-party', JSON.stringify({ n, v: 1 })); } catch (e) { /* yok say */ }
+}
+let partyN = partyLoad();
 function cwPath(sc, k = 1) {
   ctx.beginPath();
   CW.pts.forEach((p, i) => { if (i) ctx.lineTo(p[0] * sc * k, p[1] * sc * k); else ctx.moveTo(p[0] * sc * k, p[1] * sc * k); });
@@ -1414,17 +1457,22 @@ function customRide(c) {
   const rear = dyAt(0), front = dyAt(n - 1);
   return { dy: (rear + front) / 2, pitch: -Math.atan2(front - rear, ws[n - 1] - ws[0]), xm: (ws[0] + ws[n - 1]) / 2 };
 }
-/* Arabayı çiz. (x,y) yer teması, s ölçek. */
-function drawCar(c, x, y, s, o = {}) {
-  const t = o.t || 0;
-  const B = BODIES[c.body];
-  const col = COLORS[c.color][0];
-  BODY_COL = col;
+// tekerleğe göre gövdenin yüksekliği: büyük tekerlek kaldırır, kare/kendi tekerlek zıplatır
+function carRide(c) {
   const wr = WHEEL_R[c.wheels];
   const lift = (wr - 30) * 1.6;
   let sqb = 0, pitch = 0, pivX = 0;
   if (c.wheels === 3) { const a = c.wheelA % (Math.PI / 2); sqb = wr * (Math.abs(Math.cos(a)) + Math.abs(Math.sin(a)) - 1); }
   else if (c.wheels === 10) { const rd = customRide(c); sqb = rd.dy; pitch = rd.pitch; pivX = rd.xm; }
+  return { wr, lift, sqb, pitch, pivX };
+}
+/* Arabayı çiz. (x,y) yer teması, s ölçek. o.noHat: şapkayı çizme (kuledeki en üstteki arkadaş takıyor) */
+function drawCar(c, x, y, s, o = {}) {
+  const t = o.t || 0;
+  const B = BODIES[c.body];
+  const col = COLORS[c.color][0];
+  BODY_COL = col;
+  const { wr, lift, sqb, pitch, pivX } = carRide(c);
   ctx.save();
   ctx.translate(x, y); ctx.scale(s, s);
   const sq = c.squash || 0;
@@ -1452,7 +1500,7 @@ function drawCar(c, x, y, s, o = {}) {
   drawFace(c, B, t, c.honkT);
 
   // şapka
-  if (c.hat) {
+  if (c.hat && !o.noHat) {
     ctx.save(); ctx.translate(B.hat.x, B.hat.y - c.hatLift); ctx.rotate(Math.sin(t * 3) * 0.05 - c.hatLift * 0.004);
     drawHat(c.hat, t); ctx.restore();
   }
@@ -1669,11 +1717,11 @@ function drawWorld(dist, t, theme) {
 }
 
 // ============================================================ hayvanlar ve yol nesneleri
-function drawAnimal(kind, t, state, st) {
-  ctx.lineWidth = 4; ctx.strokeStyle = OUT; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+function drawAnimal(kind, t, state, st, lw = 4) {
+  ctx.lineWidth = lw; ctx.strokeStyle = OUT; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   const dizzy = state === 'duck' && st < 2.5;
   const eye = (x, y, r) => {
-    if (dizzy) { ctx.save(); ctx.translate(x, y); ctx.rotate(t * 10); ctx.lineWidth = 2.5; ctx.beginPath(); for (let a = 0; a < 10; a += 0.3) ctx.lineTo(Math.cos(a) * a * r / 10, Math.sin(a) * a * r / 10); ctx.stroke(); ctx.restore(); }
+    if (dizzy) { ctx.save(); ctx.translate(x, y); ctx.rotate(t * 10); ctx.lineWidth = 2.5 * lw / 4; ctx.beginPath(); for (let a = 0; a < 10; a += 0.3) ctx.lineTo(Math.cos(a) * a * r / 10, Math.sin(a) * a * r / 10); ctx.stroke(); ctx.restore(); }
     else { circ(x, y, r, '#fff', true); circ(x - r * 0.3, y, r * 0.5, OUT); }
   };
   const legs = (xs, top, col) => {
@@ -1734,7 +1782,7 @@ function drawAnimal(kind, t, state, st) {
   if (state === 'duck' && st < 2.5) {
     for (let i = 0; i < 3; i++) {
       const a = t * 4 + i * TAU / 3;
-      starPath(-50 + Math.cos(a) * 40, -170 + Math.sin(a) * 10, 9, 4); ctx.fillStyle = '#ffd93b'; ctx.fill(); ctx.lineWidth = 2; ctx.stroke();
+      starPath(-50 + Math.cos(a) * 40, -170 + Math.sin(a) * 10, 9, 4); ctx.fillStyle = '#ffd93b'; ctx.fill(); ctx.lineWidth = 2 * lw / 4; ctx.stroke();
     }
   }
 }
@@ -1768,6 +1816,174 @@ function animalSound(k) {
   ({ inek: () => Snd.moo(), ordek: () => { Snd.quack(); Snd.quack(0.2); }, tavuk: () => Snd.cluck(), domuz: () => Snd.oink(), koyun: () => Snd.baa() })[k]();
 }
 const ANIMAL_TXT = { inek: 'MÖÖ!', ordek: 'VAK!', tavuk: 'GIDAK!', domuz: 'OİNK!', koyun: 'MEE!' };
+
+// ============================================================ yolcu arkadaşlar (doğum günü partisi)
+/* Beş hayvan arkadaş. Ölçüler drawAnimal birimlerinde (ayaklar 0, yukarısı eksi, yüz sola bakar):
+   stand: üstündekinin ayağı nereye basar · top: şapkanın oturduğu baş tepesi · head/arm/mouth: baş, omuz, ağız
+   belly: [cx, cy, rx, ry] çamur ve boya lekelerinin yeri · eyes: [x, y, r] kıkırdama gözleri için */
+const FRIENDS = {
+  inek: { name: 'Benek', emo: '🐮', fun: 'ramp', col: '#fff', skin: '#fff', party: '#4dabf7',
+    stand: -120, top: -146, head: [-82, -118], arm: [-40, -100], armLen: 44, belly: [0, -90, 75, 42], mouth: [-100, -95], eyes: [[-88, -126, 7], [-70, -126, 7]],
+    sayBday: 'Benek doğum günü partisi veriyor!', sayCall: 'Mööö! Beni de al!',
+    sayHi: 'Ben Benek! Merhaba!', sayFun: 'Ben uçan ineğim!',
+    sayThx: 'Teşekkürler kaptan! Mööö!', sayIyi: 'İyi ki doğdun Benek!' },
+  ordek: { name: 'Paytak', emo: '🦆', fun: 'wash', col: '#ffe14d', skin: '#ffe14d', party: '#ffd23f',
+    stand: -74, top: -110, head: [-34, -86], arm: [-14, -62], armLen: 32, belly: [0, -50, 44, 32], mouth: [-64, -80], eyes: [[-38, -94, 6]],
+    sayBday: 'Paytak doğum günü partisi veriyor!', sayCall: 'Vak vak! Bekle beni!',
+    sayHi: 'Ben Paytak! Yaşasın!', sayFun: 'Su! Bayıldım!',
+    sayThx: 'Sağ ol kaptan! Vak vak!', sayIyi: 'İyi ki doğdun Paytak!' },
+  tavuk: { name: 'Gıdık', emo: '🐔', fun: 'banana', col: '#fff', skin: '#fff', party: '#ff6b6b',
+    stand: -84, top: -124, head: [-30, -94], arm: [-14, -66], armLen: 32, belly: [0, -56, 40, 36], mouth: [-50, -82], eyes: [[-34, -98, 6]],
+    sayBday: 'Gıdık doğum günü partisi veriyor!', sayCall: 'Gıdak! Ben de geleyim!',
+    sayHi: 'Ben Gıdık! Gıdak gıdak!', sayFun: 'Gıdaak! Düştüm!',
+    sayThx: 'Çok teşekkürler kaptan!', sayIyi: 'İyi ki doğdun Gıdık!' },
+  domuz: { name: 'Pembiş', emo: '🐷', fun: 'mud', col: '#ffb3c7', skin: '#ffb3c7', party: '#ff6fb5',
+    stand: -104, top: -122, head: [-60, -92], arm: [-30, -84], armLen: 38, belly: [0, -74, 62, 40], mouth: [-72, -72], eyes: [[-64, -104, 6], [-48, -106, 6]],
+    sayBday: 'Pembiş doğum günü partisi veriyor!', sayCall: 'Oink! Beni de al!',
+    sayHi: 'Ben Pembiş! Hadi gidelim!', sayFun: 'Çamura bayılırım!',
+    sayThx: 'Sen bir tanesin kaptan!', sayIyi: 'İyi ki doğdun Pembiş!' },
+  koyun: { name: 'Pamuk', emo: '🐑', fun: 'boost', col: '#3a3a4a', skin: '#3a3a4a', party: '#9775fa',
+    stand: -100, top: -120, head: [-58, -96], arm: [-26, -88], armLen: 36, belly: [0, -80, 52, 32], mouth: [-62, -80], eyes: [[-64, -102, 6], [-50, -104, 6]],
+    sayBday: 'Pamuk doğum günü partisi veriyor!', sayCall: 'Meee! Ben de geliyorum!',
+    sayHi: 'Ben Pamuk! Merhaba!', sayFun: 'Yünlerim uçuyor!',
+    sayThx: 'Teşekkürler, çok eğlendim!', sayIyi: 'İyi ki doğdun Pamuk!' },
+};
+// partide anlatılan anılar (öncelik sırasıyla); bayrak, olay arkadaş araçtayken olunca konur
+const MEMORY = [
+  { k: 'fell', say: 'Muzdan düştüm, çok güldüm!' },
+  { k: 'hat', say: 'Sihirli şapkama bak!' },
+  { k: 'balloon', say: 'Balonuma bak!' },
+  { k: 'mud', say: 'Çamur çok eğlenceliydi!' },
+  { k: 'paint', say: 'Boyandım, bak!' },
+  { k: 'ramp', say: 'Uçmak çok güzeldi!' },
+  { k: 'wash', say: 'Köpükler gıdıkladı!' },
+];
+const MAGIC_HATS = [1, 3, 4, 6, 7, 9, 14, 15]; // taç, kovboy, aşçı, tavşan, viking, cadı, tek boynuz, palyaço
+const RS = 0.62; // yolcunun araba birimindeki ölçeği
+function newLook() { return { hat: 2, mud: [], paint: [], balloon: null }; }
+function newRider(kind) {
+  return { kind, state: 'seat', st: 0, how: '', fx: 0, fy: 0, ly: 0, lv: 0, jy: 0, jv: 0, k: rand(90, 170),
+    giggleT: 0, waveT: 0, mood: 'idle', look: newLook(), mem: {} };
+}
+
+function drawArm(x, y, ang, len, col, lw) {
+  const hx = x + Math.cos(ang) * len, hy = y + Math.sin(ang) * len;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(hx, hy);
+  ctx.lineWidth = lw * 3.6; ctx.strokeStyle = OUT; ctx.stroke();
+  ctx.lineWidth = lw * 2.2; ctx.strokeStyle = col; ctx.stroke();
+  ctx.lineWidth = lw; ctx.strokeStyle = OUT; circ(hx, hy, lw * 1.9, col, true);
+  return { x: hx, y: hy };
+}
+function drawBalloon(x, y, col, lw = 4) {
+  ctx.lineWidth = lw; ctx.strokeStyle = OUT;
+  ell(x, y, 26, 32, 0, col, true);
+  ell(x - 8, y - 11, 7, 11, -0.4, 'rgba(255,255,255,0.6)');
+  ctx.beginPath(); ctx.moveTo(x - 5, y + 36); ctx.lineTo(x, y + 30); ctx.lineTo(x + 5, y + 36); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.stroke();
+}
+/* Arkadaşı çiz. ctx ayaklarda, ölçeklenmiş (ve gerekiyorsa aynalanmış) olmalı.
+   mood: idle | yay | wave | wind | scared | giggle · state: idle | dizzy | run
+   o: { hat (look.hat yerine), hatScale, hatLift, hatRot, cake } */
+function drawFriend(kind, t, look, mood, state, lw = 4, detail = false, o = {}) {
+  const F = FRIENDS[kind];
+  ctx.save();
+  if (mood === 'giggle') ctx.translate(Math.sin(t * TAU * 30) * 2.5, Math.cos(t * TAU * 26) * 1.5);
+  else if (mood === 'wind') ctx.rotate(0.3);
+  else if (mood === 'scared') { const k = Math.sin(t * 22) * 0.1; ctx.scale(1 + k, 1 - k); }
+  // kollar: önce arkadaki, hayvan, sonra öndeki
+  const ax = F.arm[0], ay = F.arm[1], L = F.armLen, ac = F.col, wig = Math.sin(t * 10) * 0.25;
+  let back = null, front = null;
+  if (mood === 'yay') { back = -Math.PI / 2 + 0.6 + wig; front = -Math.PI / 2 + 0.05 - wig; }
+  else if (mood === 'wind') { back = 0.3; front = 0.1; }
+  else if (mood === 'wave') front = -Math.PI / 2 + 0.05 + Math.sin(t * 12) * 0.45;
+  if (look.balloon && back === null) back = -Math.PI / 2 + 0.7;
+  if (o.cake && front === null) front = Math.PI + 0.45;
+  let backHand = null;
+  if (back !== null) backHand = drawArm(ax + 12, ay - 4, back, L, ac, lw);
+  drawAnimal(kind, t, state === 'dizzy' ? 'duck' : state === 'run' ? 'flee' : 'idle', 0, lw);
+  // çamur ve boya lekeleri
+  const [bx, by, brx, bry] = F.belly;
+  for (const m of look.mud) { circ(bx + m.u * brx, by + m.v * bry, m.r, '#7a4a1e'); circ(bx + m.u * brx + m.r * 0.3, by + m.v * bry - m.r * 0.3, m.r * 0.3, '#9a6a3a'); }
+  for (const m of look.paint) { const x = bx + m.u * brx, y = by + m.v * bry; circ(x, y, m.r, m.col); circ(x + m.r * 0.8, y + m.r * 0.5, m.r * 0.35, m.col); circ(x - m.r * 0.7, y + m.r * 0.6, m.r * 0.25, m.col); }
+  // ağız ve kıkırdayan gözler (yalnızca büyük çizimlerde)
+  if (detail) {
+    const [mx, my] = F.mouth;
+    ctx.lineWidth = lw * 0.8; ctx.strokeStyle = kind === 'koyun' ? '#fff' : OUT;
+    if (mood === 'yay' || state === 'dizzy') { ell(mx, my, 7, 9, 0, '#c2255c', true); }
+    else if (mood === 'giggle') { ctx.beginPath(); for (let i = 0; i <= 6; i++) ctx.lineTo(mx - 9 + i * 3, my + (i % 2 ? 3 : -1)); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(mx, my - 4, 8, 0.35, Math.PI - 0.35); ctx.stroke(); }
+    if (mood === 'giggle' && state !== 'dizzy') for (const [ex, ey, er] of F.eyes) {
+      circ(ex, ey, er + 1.5, F.skin);
+      ctx.lineWidth = lw * 0.7; ctx.strokeStyle = kind === 'koyun' ? '#fff' : OUT;
+      ctx.beginPath(); ctx.moveTo(ex - er, ey + 2); ctx.lineTo(ex, ey - er * 0.7); ctx.lineTo(ex + er, ey + 2); ctx.stroke();
+    }
+  }
+  if (front !== null) {
+    const h = drawArm(ax, ay, front, L, ac, lw);
+    if (o.cake) { // pasta dilimi
+      ctx.lineWidth = lw * 0.8; ctx.strokeStyle = OUT;
+      ctx.beginPath(); ctx.moveTo(h.x - 4, h.y - 6); ctx.lineTo(h.x - 30, h.y - 18); ctx.lineTo(h.x - 30, h.y + 2); ctx.lineTo(h.x - 4, h.y + 8); ctx.closePath();
+      ctx.fillStyle = '#ffe8a3'; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(h.x - 4, h.y - 6); ctx.lineTo(h.x - 30, h.y - 18); ctx.lineWidth = lw * 1.6; ctx.strokeStyle = '#ff8fb8'; ctx.stroke();
+      circ(h.x - 26, h.y - 22, 5, '#ff3b5c');
+    }
+  }
+  // şapka
+  const hat = o.hat == null ? look.hat : o.hat;
+  if (hat) {
+    ctx.save(); ctx.translate(F.head[0], F.top - (o.hatLift || 0)); ctx.rotate(o.hatRot || 0); const hs = o.hatScale || 0.55; ctx.scale(hs, hs);
+    drawHat(hat, t); ctx.restore();
+  }
+  // balon
+  if (look.balloon && backHand) {
+    // kulede üsttekilerin arkasında kalmasın diye geriye doğru
+    const bxx = backHand.x + 62 + Math.sin(t * 2) * 5, byy = backHand.y - 64 + Math.sin(t * 3) * 4;
+    ctx.lineWidth = lw * 0.5; ctx.strokeStyle = OUT; ctx.beginPath(); ctx.moveTo(backHand.x, backHand.y); ctx.quadraticCurveTo(bxx - 10, (backHand.y + byy) / 2, bxx, byy + 34); ctx.stroke();
+    drawBalloon(bxx, byy, look.balloon, lw);
+  }
+  ctx.restore();
+}
+// kulenin araba üstündeki tabanı (ekran koordinatı). Takla dönüşünü bilerek yok sayar.
+function towerBase(c, x, y, s) {
+  const B = BODIES[c.body], a = B.ride || B.hat, rd = carRide(c), sq = c.squash || 0;
+  return { x: x + a.x * s * (1 + sq * 0.22), y: y + (a.y - rd.lift - rd.sqb) * s * (1 - sq * 0.22) };
+}
+// i. katın hedef yüksekliği (araba birimi, yukarı artı)
+function towerH(list, i) { let h = 0; for (let j = 0; j < i; j++) h -= FRIENDS[list[j].kind].stand * RS; return h; }
+/* Kuledeki herkesin ekran yeri: { x, y, a (dönüş), r }. o: { sway, air, t } */
+function towerLayout(c, x, y, s, list, o = {}) {
+  const base = towerBase(c, x, y, s), n = list.length, sway = o.sway || 0, air = o.air || 0, t = o.t || 0;
+  const out = [];
+  let lean = 0;
+  list.forEach((r, i) => {
+    const a = sway * (0.5 + 0.35 * i);
+    const px = base.x + lean, py = base.y - (r.ly + r.jy) * s;
+    lean += Math.sin(a) * -FRIENDS[r.kind].stand * RS * s;
+    // havadaki sıra: üstteki ilerleme çubuğuna değmesin
+    const rx = base.x + (i - (n - 1) / 2) * 92 * s, ry = Math.max(140, base.y - 110 * s - r.jy * s);
+    out.push({ r, x: lerp(px, rx, air), y: lerp(py, ry, air), a: lerp(a, Math.sin(t * 8 + i) * 0.3, air) });
+  });
+  out.base = base;
+  out.top = { x: base.x + lean, y: base.y - (n ? list[n - 1].ly - FRIENDS[list[n - 1].kind].stand * RS : 0) * s };
+  return out;
+}
+/* Arabanın üstündeki hayvan kulesi. Arabanın şapkasını en üstteki takar. */
+function drawTower(c, x, y, s, list, o = {}) {
+  if (!list.length) return;
+  const t = o.t || 0, B = BODIES[c.body], lay = towerLayout(c, x, y, s, list, o);
+  const sc = s * RS, lw = clamp(2.6 / sc, 4, 8);
+  lay.forEach((p, i) => {
+    const r = p.r, top = i === lay.length - 1;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a); ctx.scale(-sc, sc);
+    const fo = top && c.hat ? { hat: c.hat, hatScale: 0.6 / RS, hatLift: c.hatLift / RS, hatRot: Math.sin(t * 3) * 0.05 - c.hatLift * 0.004 } : {};
+    drawFriend(r.kind, t + i * 0.7, r.look, r.mood || 'idle', 'idle', lw, !!o.detail, fo);
+    ctx.restore();
+    if (i === 0 && B.foam) { // küvette köpüğün içinde oturur
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+      [-48, -24, 0, 24, 48].forEach((dx, k) => circ(lay.base.x + dx * s, lay.base.y - (6 + hash(k + 2) * 12) * s + Math.sin(t * 3 + k) * 1.5, (16 + hash(k + 7) * 4) * s, '#fff', true));
+    }
+  });
+}
 
 // ============================================================ sahneler
 let scene = null;
@@ -2320,27 +2536,42 @@ const CARX = 300;
 const GRAV = 2300;
 const laneScale = y => 0.56 + (y - LANES[0]) / (LANES[2] - LANES[0]) * 0.12;
 
-function buildCourse() {
+const STOP_X = [1450, COURSE_LEN * 0.40, COURSE_LEN * 0.63, COURSE_LEN * 0.90];
+const ROW_X = COURSE_LEN * 0.955; // son düzlükte kaçınılmaz çamur/boya sırası
+function buildCourse(guests = []) {
   const o = [];
   const L = COURSE_LEN;
   const specials = [
-    { type: 'gate', x: L * 0.3 }, { type: 'wash', x: L * 0.55 }, { type: 'gate', x: L * 0.75 }, { type: 'wash', x: L * 0.92 },
+    { type: 'gate', x: L * 0.3 }, { type: 'wash', x: L * 0.55 }, { type: 'gate', x: L * 0.75 }, { type: 'wash', x: L * 0.82 },
   ];
   specials.forEach(s => { s.span = true; o.push(s); });
-  const near = x => specials.some(s => Math.abs(s.x - x) < 320);
+  // durakta bekleyen arkadaşlar: üst, alt, üst, alt kenar (bazen tersi)
+  const flip = Math.random() < 0.5;
+  guests.forEach((who, i) => {
+    const top = (i % 2 === 0) !== flip;
+    o.push({ type: 'stop', x: STOP_X[i], lane: top ? 0 : 2, dy: top ? -54 : 52, who, state: 'wait', called: false, t: rand(0, 10) });
+  });
+  // son düzlük: üç şeridin hepsinde çamur ya da aynı renk boya
+  const rowMud = Math.random() < 0.5, rowCi = randi(0, COLORS.length - 1);
+  for (let l = 0; l < 3; l++) o.push(rowMud ? { type: 'mud', x: ROW_X, lane: l, row: true } : { type: 'paint', x: ROW_X, lane: l, row: true, ci: rowCi });
+  const zones = [...specials.map(s => [s.x, 320]), ...STOP_X.slice(0, guests.length).map(x => [x, 360]), [ROW_X, 200]];
+  const near = (a, b) => zones.some(([zx, r]) => b >= zx - r && a <= zx + r);
+  const nearStop = x => STOP_X.slice(0, guests.length).some(sx => x > sx - 700 && x < sx + 200);
   let x = 900, n = 0, lastType = '';
   const add = (type, lane, extra = {}) => o.push(Object.assign({ type, x, lane, t: rand(0, 10) }, extra));
   // ilk birkaç şey: kolay yıldızlar
   for (let i = 0; i < 5; i++) o.push({ type: 'star', x: 700 + i * 80, lane: 1, h: 45 });
-  x = 1250;
+  x = guests.length ? 1850 : 1250;
   const table = [['stars', 26], ['gift', 13], ['paint', 10], ['mud', 7], ['banana', 8], ['animal', 15], ['ramp', 9], ['balloons', 7], ['boost', 5]];
   const tot = table.reduce((a, b) => a + b[1], 0);
   while (x < L - 500) {
-    if (near(x)) { x += 260; continue; }
+    if (near(x, x)) { x += 260; continue; }
     let r = Math.random() * tot, type = 'stars';
     for (const [k, w] of table) { if ((r -= w) < 0) { type = k; break; } }
     if (type === lastType && type !== 'stars') type = 'stars';
     if (n < 3 && type !== 'stars') type = ['gift', 'animal', 'ramp'][n];
+    if (type === 'animal' && nearStop(x)) type = 'stars';
+    if (type === 'ramp' && near(x, x + 560)) type = 'stars'; // rampadan inişi durağa denk gelmesin
     lastType = type; n++;
     const lane = randi(0, 2);
     switch (type) {
@@ -2375,8 +2606,16 @@ function buildCourse() {
 const Drive = {
   enter() {
     Object.assign(this, { t: 0, dist: 0, speed: 0, lane: 1, ly: LANES[1], z: 0, vz: 0, rot: 0, flipV: 0, wobT: 0,
-      boostT: 0, stars: 0, finished: false, finT: 0, onRamp: null, starPulse: 0, startT: 2.6, beeps: 0, pirtT: 3, shake: 0 });
-    this.objs = buildCourse();
+      boostT: 0, stars: 0, finished: false, finT: 0, onRamp: null, starPulse: 0, startT: 4.0, beeps: 0, pirtT: 3, shake: 0 });
+    // doğum günü: sırası gelen arkadaş partiyi verir, diğer dördü duraklarda bekler
+    const bday = ANIMALS[partyN % ANIMALS.length];
+    const guests = ANIMALS.filter(k => k !== bday);
+    for (let i = guests.length - 1; i > 0; i--) { const j = randi(0, i); [guests[i], guests[j]] = [guests[j], guests[i]]; }
+    this.party = { bday, guests };
+    Object.assign(this, { riders: [], tower: [], later: [], narrT: -9, spokeT: -9, funUsed: {}, offRider: null, sway: 0, swayV: 0,
+      air: 0, stopWaiting: null, slotPop: [0, 0, 0, 0], boarded: {}, allIn: false, rowDone: false, prevLy: LANES[1], prevSp: 0, wasAir: false });
+    this.objs = buildCourse(guests);
+    say(FRIENDS[bday].sayBday, true);
     car.mud = []; car.hatLift = 0; car.hatV = 0;
     this.home = new Button({ x: 1098, y: 44, r: 28, bg: '#868e96', icon: '🏠' });
     this.homeArm = 0;
@@ -2397,15 +2636,23 @@ const Drive = {
     this.homeArm = Math.max(0, this.homeArm - dt);
     this.home.icon = this.homeArm > 0 ? '❓' : '🏠'; this.home.bg = this.homeArm > 0 ? '#ff6b6b' : '#868e96'; this.home.pulse = this.homeArm > 0;
     const hintOn = this.t < 14 && touchUsed;
-    this.upBtn.pulse = this.dnBtn.pulse = this.hornBtn.pulse = hintOn;
+    this.upBtn.pulse = this.dnBtn.pulse = hintOn;
+    this.hornBtn.pulse = hintOn || !!this.stopWaiting;
     updateCarAnim(car, dt);
     this.starPulse = Math.max(0, this.starPulse - dt * 3);
     this.shake = Math.max(0, this.shake - dt * 3);
+    for (let i = 0; i < 4; i++) this.slotPop[i] = Math.max(0, this.slotPop[i] - dt * 3);
+    // gecikmeli işler (setTimeout yerine; sahne değişince kendiliğinden biter)
+    for (const l of this.later.slice()) { l.t -= dt; if (l.t <= 0) { this.later.splice(this.later.indexOf(l), 1); l.f(); } }
+    this.updateRiders(dt);
     const s = this.carS();
     if (this.startT > 0) {
       this.startT -= dt;
       const b = this.startT > 1.8 ? 0 : this.startT > 1.0 ? 1 : this.startT > 0.2 ? 2 : 3;
-      if (b > this.beeps) { this.beeps = b; Snd.beep(b === 3); if (b === 3) say(this.theme === 'gunduz' ? 'Başla!' : THEMES[this.theme].say, true); }
+      if (b > this.beeps) {
+        this.beeps = b; Snd.beep(b === 3);
+        if (b === 3) { this.narrT = this.spokeT = this.t; say(this.theme === 'gunduz' ? 'Haydi, arkadaşları topla!' : THEMES[this.theme].say, true); }
+      }
       if (this.beeps === 0 && this.startT < 2.5) { this.beeps = 0.5; Snd.beep(false); }
       emitTrail(car, CARX, this.carY(), s, dt * 0.4, -120);
       return;
@@ -2468,6 +2715,7 @@ const Drive = {
   },
   collide(dt) {
     const cx = this.dist + CARX, s = this.carS();
+    this.stopWaiting = null;
     for (const o of this.objs) {
       const dx = o.x - cx;
       if (o.type === 'animal') this.updateAnimal(o, dt, dx);
@@ -2475,6 +2723,24 @@ const Drive = {
       if (o.done) continue;
       if (o.span) { if (dx <= 0) { o.done = true; this.hitSpan(o); } continue; }
       const laneHit = Math.abs(this.ly - LANES[o.lane]) < 46;
+      if (o.type === 'stop') {
+        if (o.state !== 'wait') continue;
+        if (dx < 800 && dx > 0) this.stopWaiting = o;
+        if (!o.called && dx < 1000 && this.startT <= -0.6) { o.called = true; animalSound(o.who); this.narrate(FRIENDS[o.who].sayCall, o); }
+        if (laneHit && dx < 140 && dx > -40) this.pickup(o, 'lane');
+        else if (dx < 60) this.pickup(o, 'boing');
+        continue;
+      }
+      // son düzlükteki sıra: bir tanesine çarpınca diğerleri sayılmaz, şerit değiştirirken kaçarsa yine de bulaşır
+      if (o.row) {
+        if (this.rowDone) { o.done = true; continue; }
+        if (dx < -80) {
+          const mine = this.objs.find(q => q.row && q.lane === this.lane) || o;
+          this.rowDone = true; mine.done = true;
+          this.hit(mine, mine.x - this.dist, LANES[mine.lane], laneScale(LANES[mine.lane]));
+          continue;
+        }
+      }
       const ls = laneScale(LANES[o.lane]);
       if (o.type === 'animal') {
         if (o.state === 'idle' && laneHit && dx < 135 && dx > -30 && this.z < 5) {
@@ -2493,7 +2759,8 @@ const Drive = {
         } else if (this.onRamp === o && dx < -len) {
           this.onRamp = null; o.done = true;
           this.vz = 980; this.flipV = TAU / (2 * 980 / GRAV); car.hatV += 900;
-          Snd.whee(); say(pick(['Uçuyoruz!', 'Yuppii!', 'Vuuuu!']), true);
+          const fl = this.funLine('ramp'); this.react('ramp'); this.spokeT = this.narrT = this.t;
+          Snd.whee(); say(fl || pick(['Uçuyoruz!', 'Yuppii!', 'Vuuuu!']), true);
           comic('VIIIN!', CARX + 60, this.carY() - 160 * s, '#6fe3ff', 60);
         }
         continue;
@@ -2503,6 +2770,7 @@ const Drive = {
       if (o.type === 'star' && !(o.h > this.z - 40 && o.h < this.z + 150)) continue;
       if ((o.type === 'gift' || o.type === 'balloons') && this.z > 120) continue;
       o.done = true;
+      if (o.row) this.rowDone = true;
       this.hit(o, o.x - this.dist, LANES[o.lane], ls);
     }
   },
@@ -2523,6 +2791,7 @@ const Drive = {
         comic('SİHİR!', CARX + 40, cy - 190 * s, '#c77dff', 60);
         say(pick(['Sihir!', 'Abrakadabra!', 'Vay! Araba değişti!', 'Bu ne böyle!']), true);
         this.addStar(sx, gy - 60, 2);
+        this.react('gift');
         break;
       }
       case 'paint': {
@@ -2532,6 +2801,7 @@ const Drive = {
         for (let i = 0; i < 24; i++) addP({ x: CARX + rand(-60, 60) * s, y: gy - rand(0, 40), vx: rand(-260, 200), vy: rand(-520, -150), g: 1400, size: rand(5, 11), life: 0.9, col });
         car.squash = 0.5; comic('ŞLAP!', CARX + 40, cy - 170 * s, col, 56);
         say(COLORS[ci][1] + '!');
+        this.react('paint', col);
         break;
       }
       case 'mud':
@@ -2540,13 +2810,15 @@ const Drive = {
         if (car.mud.length > 40) car.mud.splice(0, car.mud.length - 40);
         for (let i = 0; i < 16; i++) addP({ x: CARX + rand(-60, 60) * s, y: gy - rand(0, 20), vx: rand(-300, 150), vy: rand(-450, -120), g: 1400, size: rand(5, 10), life: 0.8, col: '#7a4a1e' });
         comic('ÇAMUR!', CARX + 40, cy - 170 * s, '#a0703a', 56);
-        say(pick(['Iyy, çamur!', 'Çamur oldu!']));
+        { const fl = this.funLine('mud'); this.react('mud');
+          if (fl) say(fl, true); else say(pick(['Iyy, çamur!', 'Çamur oldu!'])); }
         break;
       case 'banana':
         Snd.wiu(); this.wobT = 1.3; car.hatV += 300;
         comic('KAYDIK!', CARX + 40, cy - 170 * s, '#ffe14d', 56);
         for (let i = 0; i < 5; i++) addP({ kind: 'star', x: CARX, y: cy - 150 * s, vx: rand(-90, 90), vy: rand(-90, -40), size: 9, life: 1.2, col: '#ffd93b', vr: 6 });
-        say(pick(['Kaydııık!', 'Muz kabuğu!']));
+        { const fl = this.offRider ? null : this.funLine('banana'); this.react('banana');
+          if (fl) say(fl, true); else say(pick(['Kaydııık!', 'Muz kabuğu!'])); }
         break;
       case 'balloons':
         for (let i = 0; i < 3; i++) setTimeout(() => { Snd.pop(); }, i * 110);
@@ -2554,10 +2826,12 @@ const Drive = {
         for (let i = 0; i < 3; i++) { const bx = sx + (i - 1) * 30 * ls, by = gy - (190 + i * 20) * ls; sparkle(bx, by, 0.7, 6); confetti(8, bx - 20, bx + 20, by); }
         this.addStar(sx, gy - 200 * ls, 3);
         comic('PAT PAT!', sx + 20, gy - 260 * ls, '#ff6fb5', 56);
+        this.react('balloons', pick(o.cols));
         break;
       case 'boost':
         this.boostT = 1.8; Snd.whoosh(); comic('HIZ!', CARX + 60, cy - 160 * s, '#ff922b', 60);
-        say(pick(['Hızlı!', 'Turbo!']));
+        { const fl = this.funLine('boost');
+          if (fl) say(fl, true); else say(pick(['Hızlı!', 'Turbo!'])); }
         break;
     }
   },
@@ -2570,15 +2844,19 @@ const Drive = {
       comic('HER ŞEY DEĞİŞTİ!', 640, 250, '#ff6fb5', 80);
       say('Sihirli kapı! Her şey değişti!', true);
       this.addStar(CARX, cy - 100, 3);
+      this.react('gate'); this.spokeT = this.narrT = this.t;
     } else if (o.type === 'wash') {
       const had = car.mud.length > 0; car.mud = [];
       for (let i = 0; i < 30; i++) addP({ kind: 'bubble', x: CARX + rand(-90, 90), y: cy - rand(0, 140) * s, vx: rand(-200, 50) - 100, vy: rand(-120, -20), size: rand(8, 20), life: rand(0.8, 1.6) });
       for (let i = 0; i < 6; i++) setTimeout(() => Snd.bubble(), i * 70);
       sparkle(CARX, cy - 80 * s, 1, 10);
       comic(had ? 'TERTEMİZ!' : 'KÖPÜK!', CARX + 60, cy - 170 * s, '#6fe3ff', 60);
-      say(had ? 'Tertemiz oldu!' : 'Köpük köpük!', true);
+      const fl = this.funLine('wash'); this.react('wash'); this.spokeT = this.narrT = this.t;
+      say(fl || (had ? 'Tertemiz oldu!' : 'Köpük köpük!'), true);
     } else if (o.type === 'finish') {
       this.finished = true; this.finT = 0;
+      for (const r of this.riders) if (r.state !== 'seat') this.board(r, true); // kimse geride kalmaz
+      this.later = []; this.spokeT = this.narrT = this.t;
       Snd.fanfare(); confetti(120); car.hatV += 700; this.vz = 600;
       say('Yaşasın! Bitiş çizgisi!', true);
       comic('BİTTİ!', 640, 220, '#ffd93b', 100);
@@ -2599,8 +2877,10 @@ const Drive = {
     for (const o of this.objs) {
       const dx = o.x - cx;
       if (dx > 800) break;
+      if (o.type === 'stop' && o.state === 'wait' && dx > 60) { this.pickup(o, 'honk'); continue; }
       if (o.type === 'animal' && o.state === 'idle' && dx > -20) {
-        o.state = 'flee'; o.st = 0; o.done = true;
+        o.state = 'flee'; o.st = 0; o.done = true; o.wave = true; // kenara çekilip el sallar
+        for (const r of this.tower) if (r.kind === o.kind) r.waveT = 1.2; // akrabasına el sallayan yolcu
         const gy = LANES[o.lane];
         o.fleeTo = (o.lane === 2 ? 712 : o.lane === 0 ? 405 : (Math.random() < 0.5 ? 405 : 712)) - gy;
         setTimeout(() => animalSound(o.kind), 250 + scared * 200);
@@ -2612,11 +2892,189 @@ const Drive = {
     }
     if (scared) say(pick(['Kaçtı!', 'Çekil yoldan!', 'Hah ha!']));
   },
+  // ---- yolcular
+  // anlatım cümleleri birbirinin üstüne binmesin: son cümleden 1.8 sn sonra söyle
+  narrate(line, stop) {
+    const play = () => {
+      if (stop && stop.state !== 'wait') return;
+      if (typeof line === 'function') line(); else say(line, true);
+      this.spokeT = this.t;
+    };
+    const wait = Math.max(0, this.narrT + 1.8 - this.t);
+    this.narrT = this.t + wait;
+    if (wait <= 0) { play(); return; }
+    const fire = () => { const w = this.spokeT + 1.8 - this.t; if (w > 0.05) this.later.push({ t: w, f: fire }); else play(); };
+    this.later.push({ t: wait, f: fire });
+  },
+  riderPts() { return towerLayout(car, CARX, this.carY(), this.carS(), this.tower, { sway: this.sway, air: this.air, t: this.t }); },
+  pickup(o, how) {
+    if (o.state !== 'wait') return;
+    o.state = 'gone';
+    const ls = laneScale(LANES[o.lane]), sx = o.x - this.dist, gy = LANES[o.lane] + o.dy;
+    const r = newRider(o.who);
+    Object.assign(r, { state: how === 'boing' ? 'boing' : 'fly', st: 0, how, fx: sx, fy: gy - 28 * ls, fs: ls * 0.9, stop: o, bn: 0,
+      dur: how === 'lane' ? 0.45 : 0.7, arc: how === 'lane' ? 90 : 160 });
+    this.riders.push(r);
+    this.addStar(sx, gy - 130 * ls, 3);
+    const cx = sx + 40, cyy = gy - 210 * ls;
+    if (how === 'lane') {
+      Snd.clap(); Snd.hop();
+      comic('ÇAK!', cx, cyy, '#ffd93b', 60);
+      for (let i = 0; i < 8; i++) addP({ kind: 'heart', x: sx, y: gy - 90 * ls, vx: rand(-160, 160), vy: rand(-260, -80), g: 200, size: rand(9, 14), life: 1, col: pick(['#ff4d79', '#ff8fb8']) });
+    } else if (how === 'boing') {
+      Snd.boing(); r.bn = 1;
+      comic('BOİİNG!', cx, cyy, '#9dff6f', 62);
+    } else {
+      animalSound(o.who); Snd.hop();
+      comic('HOP!', cx, cyy, '#6fe3ff', 60);
+    }
+  },
+  board(r, silent = false) {
+    const wasOff = r.state === 'off';
+    r.state = 'seat'; r.st = 0;
+    this.tower.push(r);
+    const i = this.tower.length - 1;
+    r.ly = towerH(this.tower, i) + 60; r.lv = 0; r.jy = 0; r.jv = 0;
+    const p = this.riderPts()[i];
+    Snd.hop(); poof(p.x, p.y - 30, 0.5); car.squash = Math.max(car.squash, 0.3);
+    const si = this.party.guests.indexOf(r.kind);
+    if (si >= 0 && !this.boarded[r.kind]) this.slotPop[si] = 1;
+    this.boarded[r.kind] = true;
+    if (wasOff) { this.offRider = null; if (!silent) say('Geri geldim!', true); return; }
+    if (silent) return;
+    this.narrate(FRIENDS[r.kind].sayHi);
+    if (Object.keys(this.boarded).length === this.party.guests.length && !this.allIn) {
+      this.allIn = true;
+      this.narrate(() => { say('Herkes bindi! Partiye!', true); confetti(30); });
+    }
+  },
+  // kulede kimin özel anı varsa (bir kere) onun cümlesi
+  funLine(ev) {
+    const r = this.tower.find(q => FRIENDS[q.kind].fun === ev && !this.funUsed[q.kind]);
+    if (!r) return null;
+    this.funUsed[r.kind] = true;
+    return FRIENDS[r.kind].sayFun;
+  },
+  // yoldaki olaylara yolcuların tepkisi; anı bayrakları burada konur
+  react(ev, col) {
+    if (ev === 'banana') { this.knockOff(); return; }
+    const pts = this.riderPts();
+    for (const r of this.tower) {
+      const L = r.look, m = r.mem;
+      if (ev === 'mud') {
+        m.mud = true;
+        for (let k = randi(2, 3); k > 0; k--) L.mud.push({ u: rand(-0.7, 0.7), v: rand(-0.6, 0.5), r: rand(14, 22) });
+        if (L.mud.length > 9) L.mud.splice(0, L.mud.length - 9);
+      } else if (ev === 'paint') {
+        m.paint = true;
+        for (let k = 0; k < 3; k++) L.paint.push({ u: rand(-0.7, 0.7), v: rand(-0.6, 0.5), r: rand(16, 24), col });
+        if (L.paint.length > 9) L.paint.splice(0, L.paint.length - 9);
+      } else if (ev === 'wash') {
+        L.mud = r.kind === 'domuz' ? L.mud.slice(0, 1) : []; L.paint = [];
+        r.giggleT = 1.5; m.wash = true;
+      } else if (ev === 'gate') { L.hat = pick(MAGIC_HATS); m.hat = true; }
+      else if (ev === 'gift') r.jv += 300;
+      else if (ev === 'ramp') m.ramp = true;
+    }
+    if (ev === 'balloons') { const r = this.tower.find(q => !q.look.balloon); if (r) { r.look.balloon = col; r.mem.balloon = true; } }
+    for (const p of pts) {
+      if (ev === 'gift') sparkle(p.x, p.y - 40, 0.6, 5);
+      if (ev === 'mud' && p.r.kind === 'domuz') for (let i = 0; i < 6; i++) addP({ kind: 'heart', x: p.x + rand(-20, 20), y: p.y - 50, vx: rand(-60, 60), vy: rand(-160, -80), size: rand(8, 12), life: 1.1, col: '#ff4d79' });
+    }
+    if (ev === 'ramp' && pts.length) addP({ kind: 'text', str: 'YUPPİ!', x: pts.base.x, y: pts.base.y - 120, vy: -160, size: 44, life: 1.1, col: '#ffd93b', rot: rand(-0.2, 0.2) });
+  },
+  // muza basınca biri (önce Gıdık) düşer, zıplar, koşar ve geri biner
+  knockOff() {
+    if (this.offRider || !this.tower.length) return;
+    const r = this.tower.find(q => q.kind === 'tavuk') || this.tower[this.tower.length - 1];
+    const p = this.riderPts().find(q => q.r === r);
+    this.tower.splice(this.tower.indexOf(r), 1);
+    Object.assign(r, { state: 'off', st: 0, bn: 0, fx: p.x, fy: p.y });
+    r.mem.fell = true;
+    this.offRider = r;
+    animalSound(r.kind);
+  },
+  updateRiders(dt) {
+    // kule sallanması: şerit değişimi ve hızlanma, muzda büyük sallantı
+    const ldt = Math.max(dt, 1e-3);
+    const lyV = (this.ly - this.prevLy) / ldt, spA = (this.speed - this.prevSp) / ldt;
+    this.prevLy = this.ly; this.prevSp = this.speed;
+    const tgt = clamp(-lyV * 0.0012 - spA * 0.0005, -0.35, 0.35) + (this.wobT > 0 ? this.rot * 0.9 : 0);
+    this.swayV += ((tgt - this.sway) * 60 - this.swayV * 7) * dt; this.sway += this.swayV * dt;
+    // rampada havalanınca kule dağılır, inince yeniden üst üste
+    const air = this.flipV !== 0;
+    this.air = air ? Math.min(1, this.air + dt * 6) : Math.max(0, this.air - dt * 8);
+    if (this.wasAir && !air && this.tower.length) { Snd.pop(); for (const r of this.tower) r.jv += 280; }
+    this.wasAir = air;
+    const k02 = Math.pow(0.02, dt);
+    this.tower.forEach((r, i) => {
+      r.lv += (towerH(this.tower, i) - r.ly) * 180 * dt; r.lv *= k02; r.ly += r.lv * dt;
+      r.jv += (car.hatLift * (0.5 + 0.3 * i) - r.jy) * r.k * dt; r.jv *= k02; r.jy += r.jv * dt;
+    });
+    let pts = null;
+    for (const r of this.riders) {
+      r.st += dt;
+      r.giggleT = Math.max(0, r.giggleT - dt); r.waveT = Math.max(0, r.waveT - dt);
+      r.mood = this.air > 0.3 ? 'yay' : this.boostT > 0 ? 'wind' : this.wobT > 0 ? 'scared' : r.giggleT > 0 ? 'giggle' : r.waveT > 0 ? 'wave' : 'idle';
+      if (r.state === 'seat') {
+        if (r.giggleT > 0 && Math.random() < dt * 10) {
+          pts = pts || this.riderPts(); const p = pts.find(q => q.r === r);
+          if (p) addP({ kind: 'bubble', x: p.x + rand(-30, 30), y: p.y - rand(10, 60), vx: rand(-80, 20), vy: rand(-90, -40), size: rand(6, 12), life: 0.9 });
+        }
+        continue;
+      }
+      if (r.state === 'boing') {
+        if (r.bn < 2 && r.st >= 0.25) { r.bn = 2; Snd.boing(); }
+        if (r.st >= 0.5 + r.dur) this.board(r);
+      } else if (r.state === 'fly') {
+        if (r.st >= r.dur) this.board(r);
+      } else if (r.state === 'off') {
+        if (r.bn < 1 && r.st >= 0.5) { r.bn = 1; Snd.boing(); }
+        if (r.bn < 2 && r.st >= 0.85) { r.bn = 2; Snd.boing(); }
+        if (r.st >= 2.2) this.board(r);
+      }
+      if (r.state !== 'seat' && r.st > 3) this.board(r, true); // bekçi: kimse kaybolmaz
+    }
+  },
+  // kuleye binmemiş (uçan, zıplayan, düşen) yolcunun ekrandaki yeri
+  freePos(r) {
+    const s = this.carS(), top = this.riderPts().top, sc = s * RS, t = this.t;
+    const tween = (x0, y0, sc0, u, arc, spin) => {
+      const e = u * u * (3 - 2 * u);
+      return { x: lerp(x0, top.x, e), y: lerp(y0, top.y, e) - Math.sin(u * Math.PI) * arc, rot: u * spin, sc: lerp(sc0, sc, e), mood: 'yay', state: 'idle', mirror: true };
+    };
+    if (r.state === 'fly') return tween(r.fx, r.fy, r.fs, clamp(r.st / r.dur, 0, 1), r.arc, TAU);
+    if (r.state === 'boing') {
+      const o = r.stop, ls = laneScale(LANES[o.lane]), sx = o.x - this.dist, gy = LANES[o.lane] + o.dy - 28 * ls;
+      if (r.st < 0.5) {
+        const h = r.st < 0.25 ? Math.sin(r.st / 0.25 * Math.PI) * 40 : Math.sin((r.st - 0.25) / 0.25 * Math.PI) * 90;
+        return { x: sx, y: gy - h, rot: 0, sc: r.fs, mood: 'yay', state: 'idle', mirror: false };
+      }
+      return tween(sx, gy, r.fs, clamp((r.st - 0.5) / r.dur, 0, 1), 240, TAU * 2);
+    }
+    // düşen yolcu: arabaya göre konum, yol akarken kaybolmaz
+    const gy = this.ly, st = r.st, bx = CARX - 150;
+    if (st < 0.5) { const u = st / 0.5; return { x: lerp(r.fx, bx, u), y: lerp(r.fy, gy, u * u) - Math.sin(u * Math.PI) * 140, rot: -u * TAU * 1.5, sc, mood: 'scared', state: 'idle', mirror: true }; }
+    if (st < 1.2) { const u = (st - 0.5) / 0.7; return { x: bx, y: gy - Math.abs(Math.sin(u * TAU)) * (u < 0.5 ? 60 : 30), rot: 0, sc, mood: 'idle', state: 'dizzy', mirror: true }; }
+    if (st < 1.7) { const u = (st - 1.2) / 0.5; return { x: lerp(bx, CARX - 60, u), y: gy - Math.abs(Math.sin(t * 18)) * 6, rot: 0, sc, mood: 'idle', state: 'run', mirror: true }; }
+    const u = clamp((st - 1.7) / 0.5, 0, 1);
+    return tween(CARX - 60, gy, sc, u, 160, TAU);
+  },
+  drawFreeRiders(t) {
+    for (const r of this.riders) {
+      if (r.state === 'seat') continue;
+      const p = this.freePos(r), lw = clamp(2.6 / p.sc, 4, 8);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(p.mirror ? -p.sc : p.sc, p.sc);
+      drawFriend(r.kind, t, r.look, p.mood, p.state, lw, p.sc > 0.4);
+      ctx.restore();
+    }
+  },
   laneUp() { if (this.lane > 0) { this.lane--; Snd.swish(); } },
   laneDown() { if (this.lane < 2) { this.lane++; Snd.swish(); } },
   key(e) {
     const k = e.key;
     if (this.finished) return;
+    if (this.startT > 2.6) { this.startT = 2.6; if (!e.repeat) this.doHonk(); return; } // davetiyeyi geç
     if (k === 'ArrowUp' || k === 'w' || k === 'W') this.laneUp();
     else if (k === 'ArrowDown' || k === 's' || k === 'S') this.laneDown();
     else if (k === 'ArrowRight' || k === 'ArrowLeft' || k === 'Shift' || k === 'Control' || k === 'Alt' || k === 'Meta') { /* hız */ }
@@ -2629,9 +3087,17 @@ const Drive = {
       return;
     }
     if (this.finished) return;
+    if (this.startT > 2.6) { this.startT = 2.6; Snd.pop(); return; } // davetiyeyi geç
     if (this.upBtn.hit(p)) { this.upBtn.press = 1; this.laneUp(); return; }
     if (this.dnBtn.hit(p)) { this.dnBtn.press = 1; this.laneDown(); return; }
     if (this.hornBtn.hit(p)) { this.hornBtn.press = 1; this.doHonk(); return; }
+    // duraktaki arkadaşa dokun → atlar
+    if (this.startT <= 0) for (const o of this.objs) {
+      if (o.type !== 'stop' || o.state !== 'wait') continue;
+      const sx = o.x - this.dist; if (sx < -100 || sx > W + 100) continue;
+      const ls = laneScale(LANES[o.lane]), gy = LANES[o.lane] + o.dy;
+      if (Math.hypot(p.x - sx, p.y - (gy - 85 * ls)) < 90) { this.pickup(o, 'tap'); return; }
+    }
     const cy = this.carY(), s = this.carS();
     if (Math.abs(p.x - CARX) < 150 * s * 1.2 && p.y > cy - 200 * s && p.y < cy + 10) { this.doHonk(); return; }
     if (p.y < this.ly - 50) this.laneUp(); else if (p.y > this.ly + 25) this.laneDown(); else this.doHonk();
@@ -2650,6 +3116,47 @@ const Drive = {
         if (o.state === 'idle') ctx.translate(0, -Math.abs(Math.sin(t * 3 + o.t)) * 4);
         if (o.state === 'flee' && o.fleeTo < 0) ctx.scale(0.9, 0.9);
         drawAnimal(o.kind, t + o.t, o.state, o.st);
+        if (o.wave) { const F = FRIENDS[o.kind]; drawArm(F.arm[0], F.arm[1], -Math.PI / 2 + 0.05 + Math.sin(t * 12 + o.t) * 0.45, F.armLen, F.col, 4); }
+        break;
+      }
+      case 'stop': { // otobüs durağı, trambolin ve bekleyen arkadaş
+        const F = FRIENDS[o.who];
+        ctx.lineWidth = 5; ctx.strokeStyle = OUT;
+        // direğe bağlı iki parti balonu
+        for (let i = 0; i < 2; i++) {
+          const bx = -130 + i * 46 + Math.sin(t * 2 + i) * 6, by = -330 - i * 22 + Math.sin(t * 3 + i * 2) * 5;
+          ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-90, -236); ctx.quadraticCurveTo(bx, by + 70, bx, by + 34); ctx.stroke();
+          drawBalloon(bx, by, i ? '#ffd23f' : F.party);
+        }
+        ctx.lineWidth = 5;
+        ctx.beginPath(); rr(-97, -250, 14, 250, 5); ctx.fillStyle = '#e9ecef'; ctx.fill(); ctx.stroke();
+        circ(-90, -262, 36, '#3d8bff', true);
+        ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; circ(-90, -262, 29, null, true);
+        emoji('🚌', -90, -260, 38);
+        // trambolin
+        ctx.lineWidth = 5; ctx.strokeStyle = OUT;
+        for (const lx of [-44, 44]) { ctx.beginPath(); ctx.moveTo(lx, -22); ctx.lineTo(lx * 1.2, 0); ctx.stroke(); }
+        const sag = o.state === 'wait' ? Math.max(0, -Math.sin(t * 4 + o.t)) * 6 : 0;
+        ctx.beginPath(); ctx.ellipse(0, -24, 64, 15, 0, 0, TAU); ctx.fillStyle = '#ff6b6b'; ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, -24 + sag * 0.5, 50, 10, 0, 0, TAU); ctx.fillStyle = '#343a40'; ctx.fill();
+        if (o.state === 'wait') {
+          const b = Math.max(0, Math.sin(t * 4 + o.t)) * 18;
+          ctx.save(); ctx.translate(0, -28 - b); ctx.scale(0.9, 0.9);
+          drawFriend(o.who, t + o.t, newLook(), 'wave', 'idle', 4, true);
+          ctx.restore();
+          // 👋 balonu
+          const qy = -28 + F.top * 0.9 - 110 + Math.sin(t * 3) * 6;
+          ctx.lineWidth = 4; ctx.strokeStyle = OUT;
+          ctx.beginPath(); ctx.moveTo(-10, qy + 30); ctx.lineTo(4, qy + 52); ctx.lineTo(14, qy + 28); ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+          circ(0, qy, 38, '#fff', true); ctx.fillStyle = '#fff'; ctx.fillRect(-12, qy + 22, 24, 12);
+          ctx.save(); ctx.translate(0, qy); ctx.rotate(Math.sin(t * 10) * 0.25); emoji('👋', 0, 0, 44); ctx.restore();
+          if (!touchUsed) { // boşluk tuşu
+            ctx.save(); ctx.translate(68, qy + 18); ctx.lineWidth = 4;
+            ctx.beginPath(); rr(-40, -16, 80, 32, 8); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-24, -6); ctx.lineTo(-24, 6); ctx.lineTo(24, 6); ctx.lineTo(24, -6); ctx.stroke();
+            ctx.restore();
+          }
+        }
         break;
       }
       case 'ramp': {
@@ -2811,11 +3318,13 @@ const Drive = {
         const shw = 120 * s * Math.max(0.3, 1 - this.z / 400);
         ell(CARX, this.ly + 2, shw * 1.2, 12 * s * 1.5, 0, 'rgba(0,0,0,0.25)');
         let x = CARX; if (this.startT > 0) x += Math.sin(t * 70) * 1.5;
-        drawCar(car, x, this.carY(), s, { t, rot: this.rot });
+        drawCar(car, x, this.carY(), s, { t, rot: this.rot, noHat: this.tower.length > 0 });
+        drawTower(car, x, this.carY(), s, this.tower, { t, sway: this.sway, air: this.air });
       } else this.drawObj(it.o, it.sx, t);
     }
     for (const [o, sx] of vis) if (o.span) this.drawSpan(o, sx, t, true);
     drawP();
+    this.drawFreeRiders(t);
     ctx.restore();
     this.drawHUD(t);
   },
@@ -2833,7 +3342,15 @@ const Drive = {
     ctx.beginPath(); rr(bx, by, bw, 22, 11); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fill(); ctx.stroke();
     ctx.beginPath(); rr(bx + 3, by + 3, Math.max(16, (bw - 6) * p), 16, 8); ctx.fillStyle = '#69db7c'; ctx.fill();
     for (const o of this.objs) if (o.type === 'gate' || o.type === 'wash') emoji(o.type === 'gate' ? '🌈' : '🫧', bx + bw * o.x / COURSE_LEN, by + 11, 22);
+    for (const o of this.objs) if (o.type === 'stop' && o.state === 'wait') emoji(FRIENDS[o.who].emo, bx + bw * o.x / COURSE_LEN, by + 11 + Math.sin(t * 4 + o.x) * 2, 24);
     emoji('🏁', bx + bw + 22, by + 8, 40);
+    if (this.startT <= 2.25) { const k = 1 + Math.sin(t * 3) * 0.06; emoji('🎂', 952, 50 - Math.abs(Math.sin(t * 2)) * 3, 34 * k); }
+    // arkadaş yuvaları: binen arkadaş parlar
+    this.party.guests.forEach((k, i) => {
+      const x = 44 + i * 58, y = 118, on = !!this.boarded[k], sp = 1 + this.slotPop[i] * 0.4;
+      ctx.lineWidth = 4; ctx.strokeStyle = OUT; circ(x, y, 24, on ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.6)', true);
+      ctx.globalAlpha = on ? 1 : 0.3; emoji(FRIENDS[k].emo, x, y + 1, 30 * sp); ctx.globalAlpha = 1;
+    });
     ctx.save(); const mc = { ...car, hatLift: 0, honkT: 0, squash: 0, mud: car.mud };
     drawCar(mc, bx + bw * p, by + 18, 0.2, { t }); ctx.restore();
     // ipuçları
@@ -2851,8 +3368,9 @@ const Drive = {
       ctx.globalAlpha = 1;
     }
     if (!this.finished) { this.upBtn.draw(t); this.dnBtn.draw(t); this.hornBtn.draw(t); }
+    if (this.startT > 2.25) this.drawInvite(t);
     // trafik ışığı
-    if (this.startT > 0) {
+    if (this.startT > 0 && this.startT <= 2.6) {
       ctx.save(); ctx.translate(640, 250);
       ctx.lineWidth = 6; ctx.strokeStyle = OUT; ctx.beginPath(); rr(-60, -150, 120, 300, 30); ctx.fillStyle = '#343a40'; ctx.fill(); ctx.stroke();
       const b = this.beeps;
@@ -2867,63 +3385,385 @@ const Drive = {
     }
     this.home.draw(t);
   },
+  // davetiye: doğum günü olan arkadaş, pasta ve misafirler; sonra küçülüp 🎂 işaretine uçar
+  drawInvite(t) {
+    const pop = easeOut(clamp((4.0 - this.startT) / 0.25, 0, 1));
+    const fly = clamp((2.6 - this.startT) / 0.35, 0, 1), fe = fly * fly;
+    const x = lerp(640, 952, fe), y = lerp(230, 50, fe), sc = (0.4 + 0.6 * pop) * (1 - fe * 0.93) * (pop < 1 ? 1 + Math.sin(pop * Math.PI) * 0.15 : 1);
+    ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); ctx.rotate(Math.sin(t * 2) * 0.03);
+    ctx.globalAlpha = 1 - fe * 0.4;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); rr(-256, -102, 520, 220, 28); ctx.fill();
+    ctx.lineWidth = 6; ctx.strokeStyle = OUT; ctx.beginPath(); rr(-260, -110, 520, 220, 28); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke();
+    // konfeti kenarlık
+    const cols = ['#ff4747', '#ffd23f', '#4cc95a', '#3d8bff', '#ff6fb5', '#9b5de5'];
+    for (let i = 0; i < 40; i++) {
+      const u = i / 40, per = 2 * (500 + 200);
+      let d = u * per, px, py;
+      if (d < 500) { px = -250 + d; py = -100; } else if ((d -= 500) < 200) { px = 250; py = -100 + d; } else if ((d -= 200) < 500) { px = 250 - d; py = 100; } else { d -= 500; px = -250; py = 100 - d; }
+      ctx.save(); ctx.translate(px, py); ctx.rotate(hash(i) * TAU + t * 2); ctx.fillStyle = cols[i % 6]; ctx.fillRect(-7, -4, 14, 8); ctx.restore();
+    }
+    const host = this.party.bday;
+    ctx.save(); ctx.translate(-120, 86 - Math.abs(Math.sin(t * 5)) * 14); ctx.scale(0.85, 0.85);
+    drawFriend(host, t, Object.assign(newLook(), { hat: 1 }), 'yay', 'idle', 4, true);
+    ctx.restore();
+    ctx.save(); ctx.translate(40, 0); ctx.rotate(Math.sin(t * 4) * 0.08); emoji('🎂', 0, 0, 120); ctx.restore();
+    ctx.globalAlpha *= 0.35;
+    this.party.guests.forEach((k, i) => emoji(FRIENDS[k].emo, 140 + (i % 2) * 66, -40 + Math.floor(i / 2) * 76, 54));
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  },
 };
 // başlangıç sayacı sonrası "BAŞLA" yazısının görünmesi için startT eksiye devam etsin
 const _du = Drive.update;
 Drive.update = function (dt) { if (this.startT <= 0 && this.startT > -1) this.startT -= dt; _du.call(this, dt); };
 
-// ---------------- Bitiş / sonuç
+// ---------------- Bitiş: doğum günü partisi
+const PARTY_SPOTS = [450, 570, 690, 810], PARTY_Y = 650, PARTY_SC = 0.62;
+const PARTY_CAR = { x: 250, y: 610, s: 0.8 }, CAKE = { x: 1000, y: 400 }, HOST = { x: 1170, y: 640, s: 0.7 };
 const End = {
   enter() {
-    this.t = 0; this.stars = Drive.stars; this.shown = 0;
-    this.again = new Button({ x: 540, y: 640, r: 64, bg: '#40c057', icon: '🔁', pulse: true });
-    this.garage = new Button({ x: 740, y: 640, r: 56, bg: '#4dabf7', icon: '🔧' });
-    Music.play('garage');
-    setTimeout(() => say('Harikaydın! Bir daha oynayalım mı?', true), 400);
-    confetti(80);
+    Object.assign(this, { t: 0, pt: 0, phase: 'arrive', later: [], shown: 0, starPulse: 0, stars: Drive.stars || 0,
+      carX: -250, skidded: false, candles: true, nagged: false, songD: 6, balloons: [], balT: 0, idleT: 0, closed: false,
+      keyT: 0, voiceT: -9, hostJy: 0, hostJv: 0, beat: -1, hostSliceT: undefined, closeQueued: false });
+    this.host = (Drive.party && Drive.party.bday) || ANIMALS[partyN % ANIMALS.length];
+    const src = Drive.tower && Drive.tower.length ? Drive.tower : ANIMALS.filter(k => k !== this.host).map(k => newRider(k));
+    this.guests = src.map((r, i) => ({ kind: r.kind, look: JSON.parse(JSON.stringify(r.look)), mem: Object.assign({}, r.mem),
+      state: 'ride', x: 0, y: 0, x0: 0, y0: 0, vx: 0, vy: 0, st: 0, T: 0.6, home: { x: PARTY_SPOTS[i % 4], y: PARTY_Y },
+      ly: 0, jy: 0, hop: 0, hv: 0, stepT: 0, heard: false, line: '', pri: 99, cake: false, sliceT: -99, mood: 'idle' }));
+    // anılar: her misafir, öncekilerin almadığı en önemli anısını anlatır; yoksa teşekkür eder
+    const taken = {};
+    for (const g of this.guests) {
+      const m = MEMORY.find(q => g.mem[q.k] && !taken[q.k]);
+      if (m) { taken[m.k] = true; g.line = m.say; g.pri = MEMORY.indexOf(m); } else g.line = FRIENDS[g.kind].sayThx;
+    }
+    this.again = new Button({ x: 700, y: 200, r: 64, bg: '#40c057', icon: '🔁', visible: false });
+    this.garage = new Button({ x: 560, y: 200, r: 56, bg: '#4dabf7', icon: '🔧', visible: false });
+    car.hatLift = 0; car.hatV = 0;
+    partySave(partyN + 1);
+    Music.play('party');
+    confetti(40);
+    this.later.push({ t: 0.3, f: () => say('Partiye geldik!', true) });
+    this.later.push({ t: 0.9, f: () => comic('PARTİ!', 640, 300, '#ff6fb5', 80) });
   },
+  riding() { return this.guests.filter(g => g.state === 'ride'); },
+  setPhase(p) {
+    this.phase = p; this.pt = 0;
+    if (p !== 'arrive' && p !== 'out') this.again.visible = this.garage.visible = true;
+    if (p === 'out') {
+      // en üstteki önce atlar
+      this.riding().reverse().forEach((g, k) => { g.launchAt = k * 0.15; });
+    } else if (p === 'cake') {
+      say('Hoş geldiniz!', true);
+      this.later.push({ t: 1.5, f: () => { if (this.phase === 'cake') say('Hadi, pastaya dokun!', true); } });
+    } else if (p === 'blow') {
+      this.candles = false; Snd.blow(); Music.stop();
+      comic('PUF!', CAKE.x, CAKE.y - 160, '#ffffff', 70);
+      for (let i = 0; i < 5; i++) for (let k = 0; k < 4; k++) addP({ x: CAKE.x - 40 + i * 20, y: CAKE.y - 100, vx: rand(-30, 30), vy: rand(-120, -60), size: rand(8, 14), grow: 30, life: rand(0.8, 1.3), col: 'rgba(200,200,210,0.8)' });
+    } else if (p === 'song') {
+      this.songD = Snd.birthday();
+      this.guests.forEach((g, i) => { g.sliceT = -i * 0.15; });
+      this.hostSliceT = -this.guests.length * 0.15;
+    } else if (p === 'cheer') {
+      say(FRIENDS[this.host].sayIyi, true);
+      confetti(80); Snd.fanfare();
+      Music.play('party');
+    } else if (p === 'thanks') {
+      let best = null;
+      for (const g of this.guests) if (!best || g.pri < best.pri) best = g;
+      if (best) this.talk(best);
+    } else if (p === 'free') this.idleT = 0;
+  },
+  // dokununca/tuşa basınca araba gelişini ve inişi atla
+  skip() {
+    if (this.phase === 'arrive') { this.carX = PARTY_CAR.x; car.squash = 0.4; this.setPhase('out'); }
+    else if (this.phase === 'out') for (const g of this.guests) if (g.state !== 'land') this.land(g);
+  },
+  launch(g) {
+    const lay = towerLayout(car, this.carX, PARTY_CAR.y, PARTY_CAR.s, this.riding());
+    const p = lay.find(q => q.r === g) || lay.top;
+    g.state = 'fly'; g.st = 0; g.x0 = p.x; g.y0 = p.y;
+    g.vx = (g.home.x - g.x0) / g.T; g.vy = (g.home.y - g.y0 - 0.5 * 1800 * g.T * g.T) / g.T;
+    Snd.whee();
+  },
+  land(g) {
+    g.state = 'land'; g.x = g.home.x; g.y = g.home.y;
+    poof(g.x, g.y - 40, 0.6); animalSound(g.kind);
+  },
+  hop(g) { if (g.hop < 4) g.hv = 560; },
+  // misafir anısını ya da teşekkürünü söyler (şarkı sırasında yalnızca zıplar ve ses çıkarır)
+  talk(g) {
+    this.hop(g);
+    if (this.phase !== 'thanks' && this.phase !== 'free') { animalSound(g.kind); return; }
+    g.stepT = 2.2; Snd.hop(); this.idleT = 0; this.voiceT = this.t;
+    if (!g.heard) { g.heard = true; say(g.line, true); } else say(FRIENDS[g.kind].sayHi, true);
+    if (this.guests.every(q => q.heard) && !this.closed && !this.closeQueued) {
+      this.closeQueued = true;
+      this.later.push({ t: 2.6, f: () => this.close() });
+    }
+  },
+  close() {
+    if (this.closed) return;
+    this.closed = true; this.again.pulse = true;
+    say('Harika bir parti oldu! Bir daha oynayalım mı?', true);
+  },
+  hostTalk() {
+    if (this.hostJy < 4) this.hostJv = 560;
+    if (this.phase === 'thanks' || this.phase === 'free') { Snd.hop(); say(FRIENDS[this.host].sayHi, true); this.idleT = 0; }
+    else animalSound(this.host);
+  },
+  popBalloon(b) {
+    this.balloons.splice(this.balloons.indexOf(b), 1);
+    Snd.pop(); sparkle(b.x, b.y, 0.8, 8); confetti(10, b.x - 30, b.x + 30, b.y);
+    addP({ kind: 'flystar', sx: b.x, sy: b.y, tx: 60, ty: 52, t: 0, dur: 0.75, life: 2, onDone: () => { this.stars++; this.starPulse = 1; } });
+    // şarkıyı ve arkadaşların anlattıklarını bölmesin
+    if (this.phase === 'free' && this.t - this.voiceT > 2.5) say(pick(['Pat!', 'Bir balon daha!']));
+  },
+  honkCar() { honk(car, this.carX, PARTY_CAR.y, PARTY_CAR.s); },
   update(dt) {
-    this.t += dt;
+    this.t += dt; this.pt += dt;
     updateCarAnim(car, dt);
-    if (Math.random() < 0.15) confetti(1);
+    this.starPulse = Math.max(0, this.starPulse - dt * 3);
+    for (const l of this.later.slice()) { l.t -= dt; if (l.t <= 0) { this.later.splice(this.later.indexOf(l), 1); l.f(); } }
     const target = Math.min(this.stars, Math.floor(this.t * 25));
-    if (target > this.shown) { this.shown = target; if (this.shown % 2 === 0) Snd.tone(800 + this.shown * 8, 0.05, { type: 'triangle', vol: 0.06 }); }
-    car.wheelA += dt * 3;
-    if (Math.floor(this.t * 2) !== Math.floor((this.t - dt) * 2)) { car.squash = 0.4; car.hatV += 200; }
-    emitTrail(car, 640, 520, 1.0, dt * 0.6, -150);
+    if (target > this.shown) { this.shown = target; if (this.shown % 2 === 0) Snd.tone(800 + Math.min(this.shown, 120) * 8, 0.05, { type: 'triangle', vol: 0.06 }); }
+    const ph = this.phase, pt = this.pt;
+    if (ph === 'arrive') {
+      const u = Math.min(1, pt / 1.2);
+      const nx = lerp(-250, PARTY_CAR.x, easeOut(u));
+      car.wheelA += (nx - this.carX) / (WHEEL_R[car.wheels] * PARTY_CAR.s); this.carX = nx;
+      if (!this.skidded && pt > 0.7) { this.skidded = true; Snd.skid(); for (let i = 0; i < 8; i++) addP({ x: this.carX - 60 + rand(-30, 30), y: PARTY_CAR.y, vx: rand(-160, -40), vy: rand(-90, -20), size: rand(6, 11), grow: 20, life: 0.5, col: 'rgba(200,170,120,0.8)' }); }
+      if (u >= 1) { car.squash = 0.5; car.hatV += 300; this.setPhase('out'); }
+    } else if (ph === 'out') {
+      for (const g of this.guests) if (g.state === 'ride' && pt >= g.launchAt && this.riding().slice(-1)[0] === g) this.launch(g);
+      if (this.guests.every(g => g.state === 'land')) this.setPhase('cake');
+    } else if (ph === 'cake') {
+      if (!this.nagged && pt > 3.8) { this.nagged = true; say('Hadi, pastaya dokun!', true); }
+      if (pt > 6) this.setPhase('blow');
+    } else if (ph === 'blow') { if (pt >= 0.6) this.setPhase('song'); }
+    else if (ph === 'song') {
+      const b = Math.floor(pt / 0.72);
+      if (b !== this.beat) { this.beat = b; car.squash = 0.3; }
+      if (Math.random() < dt * 6) addP({ kind: 'note', x: rand(380, 1220), y: rand(420, 560), vy: rand(-80, -40), vx: rand(-20, 20), size: rand(24, 34), life: 1.3, col: pick(['#ff6fb5', '#3d8bff', '#9b5de5', '#ff9f1c']) });
+      if (pt >= this.songD) this.setPhase('cheer');
+    } else if (ph === 'cheer') { if (pt >= 1.6) this.setPhase('thanks'); }
+    else if (ph === 'thanks') { if (pt >= 2.3) this.setPhase('free'); }
+    else if (ph === 'free') {
+      this.idleT += dt;
+      if (!this.closed && this.idleT > 5) this.close();
+    }
+    // misafirler
+    for (const g of this.guests) {
+      g.st += dt; g.stepT = Math.max(0, g.stepT - dt);
+      if (g.state === 'fly') {
+        g.x = g.x0 + g.vx * g.st; g.y = g.y0 + g.vy * g.st + 0.5 * 1800 * g.st * g.st;
+        if (g.st >= g.T) this.land(g);
+      }
+      g.hv -= 1800 * dt; g.hop = Math.max(0, g.hop + g.hv * dt); if (g.hop <= 0) g.hv = Math.max(0, g.hv);
+      if (g.sliceT > -9 && g.sliceT < 0.5) { g.sliceT += dt; if (g.sliceT >= 0.5) { g.cake = true; Snd.pop(); } }
+      g.mood = ph === 'cheer' || (g.state === 'fly') ? 'yay' : g.stepT > 0 && (ph === 'thanks' || ph === 'free') ? 'wave' : 'idle';
+    }
+    if (this.hostSliceT !== undefined && this.hostSliceT < 0.5) { this.hostSliceT += dt; }
+    this.hostJv -= 1800 * dt; this.hostJy = Math.max(0, this.hostJy + this.hostJv * dt); if (this.hostJy <= 0) this.hostJv = Math.max(0, this.hostJv);
+    if (ph === 'arrive' && Math.floor(pt * 2.5) !== Math.floor((pt - dt) * 2.5)) this.hostJv = 420;
+    // uçan balonlar (şarkıdan sonra)
+    if (ph === 'song' || ph === 'cheer' || ph === 'thanks' || ph === 'free') {
+      this.balT -= dt;
+      if (this.balT <= 0 && this.balloons.length < 8) {
+        this.balT = 0.8;
+        this.balloons.push({ x: rand(80, 1200), y: H + 60, vy: rand(60, 90), ph: rand(0, TAU), col: pick(['#ff4747', '#ff6fb5', '#3d8bff', '#ffd23f', '#4cc95a', '#9b5de5', '#ff9f1c']) });
+      }
+    }
+    for (const b of this.balloons.slice()) {
+      b.y -= b.vy * dt; b.x += Math.sin(this.t * 1.5 + b.ph) * 20 * dt;
+      if (b.y < -80) this.balloons.splice(this.balloons.indexOf(b), 1);
+    }
+    if (Math.random() < 0.08) confetti(1);
   },
-  draw() {
-    const t = this.t;
-    drawWorld(COURSE_LEN - CARX, t, Drive.theme);
-    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, 0, W, H);
-    // kupa
-    ctx.save(); ctx.translate(470, 160 + Math.sin(t * 3) * 6); ctx.rotate(Math.sin(t * 2) * 0.06);
-    ctx.lineWidth = 6; ctx.strokeStyle = OUT;
-    ctx.beginPath(); ctx.arc(-62, -40, 26, Math.PI * 0.5, Math.PI * 1.5); ctx.stroke(); ctx.beginPath(); ctx.arc(62, -40, 26, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-62, -80); ctx.lineTo(62, -80); ctx.quadraticCurveTo(60, 10, 0, 20); ctx.quadraticCurveTo(-60, 10, -62, -80); ctx.closePath(); ctx.fillStyle = '#ffd23f'; ctx.fill(); ctx.stroke();
-    ctx.beginPath(); rr(-12, 18, 24, 30, 4); ctx.fillStyle = '#ffc400'; ctx.fill(); ctx.stroke();
-    ctx.beginPath(); rr(-44, 46, 88, 24, 6); ctx.fillStyle = '#9a6a3a'; ctx.fill(); ctx.stroke();
-    starPath(0, -36, 26, 12); ctx.fillStyle = '#fff6b0'; ctx.fill();
-    ell(-30, -58, 8, 18, 0.3, 'rgba(255,255,255,0.6)');
+  drawLawn(t, th) {
+    // yolun üstüne bahçe çimi
+    ctx.fillStyle = th.grass; ctx.fillRect(0, 418, W, H - 418);
+    ctx.fillStyle = th.grass2;
+    for (let i = 0; i < 6; i++) ctx.fillRect(0, 440 + i * 50, W, 22);
+    // toprak yol
+    ctx.fillStyle = '#c99a5b'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.beginPath(); ctx.moveTo(0, 570); ctx.quadraticCurveTo(200, 578, 390, 592); ctx.quadraticCurveTo(410, 615, 390, 640); ctx.quadraticCurveTo(200, 646, 0, 660); ctx.closePath(); ctx.fill(); ctx.stroke();
+    for (let k = 0; k < 9; k++) circ(hash(k + 70) * 360, 585 + hash(k + 80) * 60, 4 + hash(k) * 4, '#b5854a');
+    // çiçekler
+    for (let k = 0; k < 46; k++) {
+      const x = hash(k + 11) * W, y = 440 + hash(k + 33) * 270;
+      if (x < 420 && y > 560 && y < 670) continue;
+      const c = ['#ff6fb5', '#ffd23f', '#fff', '#ff4747', '#b388ff'][k % 5], r = 5 + hash(k + 5) * 3;
+      for (let i = 0; i < 5; i++) { const a = i / 5 * TAU + k; circ(x + Math.cos(a) * r, y + Math.sin(a) * r, r * 0.7, c); }
+      circ(x, y, r * 0.55, '#ffb000');
+    }
+  },
+  drawBunting(t) {
+    const col = FRIENDS[this.host].party, cols = [col, '#ffd23f', '#fff', '#4cc95a'];
+    for (let seg = 0; seg < 2; seg++) {
+      const x0 = seg * 640, x1 = x0 + 640, y0 = 72, sag = 46;
+      const yAt = x => { const u = (x - x0) / 640; return y0 + Math.sin(u * Math.PI) * sag + Math.sin(t * 2 + seg) * 3; };
+      ctx.lineWidth = 3; ctx.strokeStyle = OUT; ctx.beginPath();
+      for (let x = x0; x <= x1; x += 20) ctx.lineTo(x, yAt(x)); ctx.stroke();
+      for (let i = 0; i < 12; i++) {
+        const x = x0 + 30 + i * 50, y = yAt(x), sw = Math.sin(t * 3 + i) * 0.08;
+        ctx.save(); ctx.translate(x, y); ctx.rotate(sw);
+        ctx.beginPath(); ctx.moveTo(-18, 0); ctx.lineTo(18, 0); ctx.lineTo(0, 34); ctx.closePath();
+        ctx.fillStyle = cols[(i + seg) % 4]; ctx.fill(); ctx.lineWidth = 3; ctx.stroke(); ctx.restore();
+      }
+    }
+  },
+  drawCake(t) {
+    const col = FRIENDS[this.host].party;
+    ctx.lineWidth = 5; ctx.strokeStyle = OUT; ctx.lineJoin = 'round';
+    // piknik örtüsü
+    ctx.save(); ctx.beginPath(); ctx.moveTo(880, 560); ctx.lineTo(1120, 560); ctx.lineTo(1150, 650); ctx.lineTo(850, 650); ctx.closePath(); ctx.clip();
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 12; c++) { ctx.fillStyle = (r + c) % 2 ? '#fff' : '#ff6b6b'; ctx.fillRect(840 + c * 28 + r * 4, 560 + r * 23, 28, 23); }
     ctx.restore();
-    // yıldızlar
-    ctx.lineWidth = 5; ctx.strokeStyle = '#b8860b'; starPath(720, 160, 40, 18); ctx.fillStyle = '#ffd93b'; ctx.fill(); ctx.stroke();
-    text('× ' + this.shown, 830, 165, 76, '#fff', { stroke: OUT, lw: 12 });
-    // dans eden araba
-    ell(640, 524, 160, 18, 0, 'rgba(0,0,0,0.3)');
+    ctx.beginPath(); ctx.moveTo(880, 560); ctx.lineTo(1120, 560); ctx.lineTo(1150, 650); ctx.lineTo(850, 650); ctx.closePath(); ctx.stroke();
+    // masa
+    for (const lx of [915, 1085]) { ctx.beginPath(); rr(lx - 8, 480, 16, 96, 4); ctx.fillStyle = '#a0612b'; ctx.fill(); ctx.stroke(); }
+    ctx.beginPath(); rr(890, 466, 220, 22, 8); ctx.fillStyle = '#c47f3a'; ctx.fill(); ctx.stroke();
+    // pasta (şarkı öncesi nabız gibi atar)
+    const pulse = this.phase === 'cake' ? 1 + Math.sin(t * 6) * 0.04 : 1;
+    ctx.save(); ctx.translate(CAKE.x, 468); ctx.scale(pulse, pulse);
+    const tiers = [[180, 60], [136, 50], [92, 42]];
+    let y = 0;
+    tiers.forEach(([w, h], i) => {
+      ctx.beginPath(); rr(-w / 2, y - h, w, h, 12); ctx.fillStyle = ['#fff3e0', '#ffe8a3', '#fff3e0'][i]; ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-w / 2, y - h + 10);
+      for (let x = -w / 2; x <= w / 2; x += 18) ctx.quadraticCurveTo(x + 9, y - h + 24 + hash(x + i) * 8, x + 18, y - h + 10);
+      ctx.lineTo(w / 2, y - h + 4); ctx.lineTo(-w / 2, y - h + 4); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 5;
+      for (let k = 0; k < 3; k++) circ(-w / 3 + k * w / 3, y - h / 2 + 6, 6, ['#ff3b5c', '#ffd23f', '#4cc95a'][(k + i) % 3]);
+      y -= h;
+    });
+    // mumlar
+    for (let i = 0; i < 5; i++) {
+      const x = -36 + i * 18;
+      ctx.lineWidth = 3; ctx.beginPath(); rr(x - 5, y - 30, 10, 30, 3); ctx.fillStyle = ['#9ad7ff', '#ff9ccf', '#ffe066', '#9ff0c8', '#d0a8ff'][i]; ctx.fill(); ctx.stroke();
+      if (this.candles) {
+        const fl = 1 + Math.sin(t * 20 + i * 2) * 0.18;
+        ctx.save(); ctx.translate(x, y - 32); ctx.scale(fl, 1 / fl);
+        ctx.beginPath(); ctx.moveTo(0, -18); ctx.quadraticCurveTo(8, -5, 0, 2); ctx.quadraticCurveTo(-8, -5, 0, -18);
+        ctx.fillStyle = '#ffb020'; ctx.fill(); ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+      }
+    }
+    ctx.restore();
+  },
+  drawHost(t) {
+    const F = FRIENDS[this.host], s = HOST.s;
+    ctx.save(); ctx.translate(HOST.x, HOST.y - this.hostJy - (this.phase === 'song' ? Math.abs(Math.sin(this.pt * Math.PI / 0.24)) * 14 : 0)); ctx.scale(s, s);
+    ell(0, 0, 80, 14, 0, 'rgba(0,0,0,0.2)');
+    // balon demeti (biri elinde)
+    for (let i = 0; i < 2; i++) {
+      const bx = F.arm[0] + 12 + (i ? 40 : -20) + Math.sin(t * 2 + i) * 5, by = F.top - 150 - i * 30;
+      ctx.lineWidth = 2; ctx.strokeStyle = OUT; ctx.beginPath(); ctx.moveTo(F.arm[0] + 20, F.arm[1] - F.armLen); ctx.lineTo(bx, by + 34); ctx.stroke();
+      drawBalloon(bx, by, i ? '#ffd23f' : '#4cc95a');
+    }
+    const mood = this.phase === 'arrive' || this.phase === 'out' ? 'wave' : this.phase === 'cheer' ? 'yay' : 'idle';
+    const look = Object.assign(newLook(), { hat: 1, balloon: F.party });
+    drawFriend(this.host, t, look, mood, 'idle', 4, true, { cake: this.hostSliceT >= 0.5 && mood === 'idle' });
+    ctx.restore();
+  },
+  guestTop(g) { return -FRIENDS[g.kind].top * PARTY_SC; },
+  draw() {
+    const t = this.t, th = THEMES[Drive.theme] || THEMES.gunduz;
+    drawWorld(COURSE_LEN - CARX, t, Drive.theme);
+    this.drawLawn(t, th);
+    this.drawBunting(t);
+    this.drawCake(t);
+    // misafirler (yerdekiler), yüzleri pastaya dönük
+    const beat = this.phase === 'song' ? Math.abs(Math.sin(this.pt * Math.PI / 0.24)) * 14 : 0;
+    const landed = this.guests.filter(g => g.state === 'land').sort((a, b) => a.y - b.y);
+    for (const g of landed) {
+      const step = clamp(g.stepT / 0.3, 0, 1) * clamp((2.2 - g.stepT) / 0.3 + 1, 0, 1);
+      const sc = PARTY_SC * (1 + step * 0.1);
+      ell(g.x, g.y + step * 22 + 2, 50, 10, 0, 'rgba(0,0,0,0.2)');
+      ctx.save(); ctx.translate(g.x + step * 10, g.y + step * 22 - g.hop - beat); ctx.scale(-sc, sc);
+      drawFriend(g.kind, t + g.home.x, g.look, g.mood, 'idle', 4, true, { cake: g.cake && g.mood === 'idle' });
+      ctx.restore();
+    }
+    this.drawHost(t);
+    // araba ve üstünde henüz inmemiş olanlar
+    const ride = this.riding();
+    ride.forEach((g, i) => { g.ly = towerH(ride, i); g.jy = car.hatLift * (0.5 + 0.3 * i) * 0.6; g.mood = this.phase === 'arrive' ? 'yay' : 'idle'; });
+    ell(this.carX, PARTY_CAR.y + 2, 130, 16, 0, 'rgba(0,0,0,0.25)');
+    drawCar(car, this.carX, PARTY_CAR.y, PARTY_CAR.s, { t, noHat: ride.length > 0 });
+    drawTower(car, this.carX, PARTY_CAR.y, PARTY_CAR.s, ride, { t });
+    // havada takla atanlar
+    for (const g of this.guests) if (g.state === 'fly') {
+      const u = clamp(g.st / g.T, 0, 1), sc = lerp(PARTY_CAR.s * RS, PARTY_SC, u);
+      ctx.save(); ctx.translate(g.x, g.y); ctx.rotate(u * TAU); ctx.scale(-sc, sc);
+      drawFriend(g.kind, t, g.look, 'yay', 'idle', 4, true); ctx.restore();
+    }
+    // pasta dilimleri ellere uçuyor
+    const slices = this.guests.map(g => [g.sliceT, g.home.x + 30, g.home.y - 70]);
+    if (this.hostSliceT !== undefined) slices.push([this.hostSliceT, HOST.x - 40, HOST.y - 70]);
+    for (const [st, tx, ty] of slices) if (st >= 0 && st < 0.5) {
+      const u = st / 0.5, x = lerp(CAKE.x, tx, u), y = lerp(CAKE.y - 30, ty, u) - Math.sin(u * Math.PI) * 120;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(u * TAU); ctx.lineWidth = 3; ctx.strokeStyle = OUT;
+      ctx.beginPath(); ctx.moveTo(-14, -8); ctx.lineTo(14, -2); ctx.lineTo(-14, 10); ctx.closePath(); ctx.fillStyle = '#ffe8a3'; ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+    // uçan balonlar
+    for (const b of this.balloons) {
+      ctx.lineWidth = 2; ctx.strokeStyle = OUT; ctx.beginPath(); ctx.moveTo(b.x, b.y + 34); ctx.quadraticCurveTo(b.x + Math.sin(t * 3 + b.ph) * 12, b.y + 70, b.x, b.y + 100); ctx.stroke();
+      drawBalloon(b.x, b.y, b.col);
+    }
     drawP();
-    drawCar(car, 640, 530 - Math.abs(Math.sin(t * Math.PI * 2)) * 14, 0.9, { t, rot: Math.sin(t * Math.PI * 2) * 0.08 });
+    // yıldızlar
+    const sp = 1 + this.starPulse * 0.35;
+    ctx.save(); ctx.translate(60, 52); ctx.scale(sp, sp);
+    ctx.lineWidth = 5; ctx.strokeStyle = '#b8860b'; starPath(0, 0, 34, 16); ctx.fillStyle = '#ffd93b'; ctx.fill(); ctx.stroke();
+    ctx.restore();
+    text(String(this.shown), 104, 56, 54, '#fff', { align: 'left', stroke: OUT, lw: 10 });
     this.again.draw(t); this.garage.draw(t);
+    // ipuçları: pastayı göster, anlatacak arkadaşın üstünde 💬
+    if (this.phase === 'cake') {
+      ctx.save(); ctx.translate(CAKE.x, 230 + Math.abs(Math.sin(t * 4)) * 22); emoji('👇', 0, 0, 84); ctx.restore();
+    }
+    if (this.phase === 'thanks' || this.phase === 'free') for (const g of landed) if (!g.heard) {
+      const k = 1 + Math.sin(t * 5 + g.home.x) * 0.1;
+      ctx.save(); ctx.translate(g.x + 26, g.y - this.guestTop(g) - 70 - Math.abs(Math.sin(t * 3 + g.home.x)) * 8); ctx.scale(k, k);
+      emoji('💬', 0, 0, 52); ctx.restore();
+    }
+  },
+  guestAt(p) {
+    let best = null, bd = 1e9;
+    for (const g of this.guests) {
+      if (g.state !== 'land') continue;
+      const d = Math.hypot(p.x - g.x, p.y - (g.y - this.guestTop(g) * 0.5));
+      if (d < Math.max(70, this.guestTop(g) * 0.6) && d < bd) { bd = d; best = g; }
+    }
+    return best;
   },
   click(p) {
-    if (this.again.hit(p)) { this.again.press = 1; Snd.pop(); go(Drive); }
-    else if (this.garage.hit(p)) { this.garage.press = 1; Snd.pop(); go(Garage); }
-    else if (p.y > 300 && p.y < 580) honk(car, 640, 520, 1);
+    if (this.again.hit(p)) { this.again.press = 1; Snd.pop(); go(Drive); return; }
+    if (this.garage.hit(p)) { this.garage.press = 1; Snd.pop(); go(Garage); return; }
+    if (this.phase === 'arrive' || this.phase === 'out') { this.skip(); return; }
+    for (const b of this.balloons) if (Math.hypot(p.x - b.x, p.y - b.y) < 50) { this.popBalloon(b); return; }
+    if (this.phase === 'cake' && (Math.hypot(p.x - CAKE.x, p.y - CAKE.y) < 120 || p.x > 760)) { this.setPhase('blow'); return; }
+    const g = this.guestAt(p);
+    if (g) { this.talk(g); return; }
+    if (Math.hypot(p.x - HOST.x, p.y - (HOST.y - 60)) < 80) { this.hostTalk(); return; }
+    this.honkCar();
   },
   key(e) {
-    if (this.t < 1.2) return;
-    if (e.key === 'Enter') go(Drive);
-    else if (e.key === ' ' || e.key.length === 1) honk(car, 640, 520, 1);
+    if (e.repeat) return;
+    const k = e.key, ph = this.phase;
+    if (ph === 'arrive' || ph === 'out') { this.skip(); return; }
+    if (ph === 'cake') { this.setPhase('blow'); return; }
+    if (k === ' ') { this.honkCar(); return; }
+    if (ph === 'free') {
+      if (k === 'Enter') { go(Drive); return; }
+      if (k.length !== 1) return;
+      const g = this.guests.find(q => !q.heard);
+      if (g && this.t - this.voiceT > 1.2) this.talk(g);
+      else if (this.guests.length) this.hop(pick(this.guests));
+      return;
+    }
+    if ((k.length === 1 || k === 'Enter') && this.guests.length && this.t - this.keyT > 0.15) {
+      this.keyT = this.t;
+      const g = pick(this.guests); this.hop(g); animalSound(g.kind);
+    }
   },
   buttons() { return [this.again, this.garage]; },
 };
@@ -3035,4 +3875,13 @@ go(Title);
 requestAnimationFrame(frame);
 
 // test / hata ayıklama için
-window.__game = { get scene() { return scene; }, Title, Garage, WheelStudio, Drive, End, car, go, P: () => P, drawCar, newCar, artCv, artClear };
+window.__game = { get scene() { return scene; }, Title, Garage, WheelStudio, Drive, End, car, go, P: () => P, drawCar, newCar, artCv, artClear, FRIENDS,
+  // n misafirli, rastgele görünüşlü bir partiye atla
+  party(n = 4) {
+    const bday = ANIMALS[partyN % ANIMALS.length], guests = ANIMALS.filter(k => k !== bday).slice(0, n);
+    Drive.party = { bday, guests };
+    Drive.tower = guests.map(k => { const r = newRider(k); r.look.hat = Math.random() < 0.5 ? pick(MAGIC_HATS) : 2;
+      if (Math.random() < 0.5) r.look.mud.push({ u: 0.2, v: 0, r: 18 }); if (Math.random() < 0.5) r.look.balloon = '#ff6fb5';
+      r.mem = { hat: r.look.hat !== 2, mud: r.look.mud.length > 0, balloon: !!r.look.balloon, ramp: true, wash: Math.random() < 0.5, fell: k === 'tavuk' }; return r; });
+    go(End);
+  } };

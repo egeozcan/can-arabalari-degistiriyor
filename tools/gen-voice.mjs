@@ -28,7 +28,7 @@ export function lines() {
   const spoken = s => /^[A-ZÇĞİÖŞÜ]/.test(s); // 'gunduz', 'horn' gibi anahtarları ele
   for (const l of src.split('\n')) {
     if (/\bsay\(/.test(l) && !/^\s*(say\(t|const say)/.test(l)) strs(l).filter(spoken).forEach(s => out.add(s));
-    const th = l.match(/\bsay: '([^']+)'/); if (th) out.add(th[1]);
+    for (const m of l.matchAll(/\bsay\w*: '([^'\\]+)'/g)) out.add(m[1]); // say: '…', sayHi: '…' gibi özellikler
   }
   // seçenek adları (korna hariç; korna adları söylenmiyor)
   for (const m of src.matchAll(/key: '(\w+)'[^\n]*?names: \[([^\]]*)\]/g)) if (m[1] !== 'horn') strs(m[2]).forEach(s => out.add(s));
