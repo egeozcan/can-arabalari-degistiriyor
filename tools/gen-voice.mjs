@@ -32,6 +32,10 @@ export function lines() {
   }
   // seçenek adları (korna hariç; korna adları söylenmiyor)
   for (const m of src.matchAll(/key: '(\w+)'[^\n]*?names: \[([^\]]*)\]/g)) if (m[1] !== 'horn') strs(m[2]).forEach(s => out.add(s));
+  // çıkartma adları ve tümsek ölçeri seviyeleri (game.js'te dizi olarak duruyor, ünlemle söylenenler ünlemli)
+  strs(src.match(/const STICKER_NAMES = \[([\s\S]*?)\];/)[1]).forEach(s => out.add(s + '!'));
+  strs(src.match(/const BUMP_TXT = \[([^\]]*)\]/)[1]).forEach(s => out.add(s));
+  for (let n = 3; n <= 16; n++) out.add(`${n} köşe!`);
   const colors = src.match(/const COLORS = \[([\s\S]*?)\];/)[1];
   for (const m of colors.matchAll(/\['#[0-9a-f]+', '([^']+)'\]/gi)) out.add(m[1]);
   return [...out];
